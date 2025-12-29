@@ -1,0 +1,160 @@
+# Base schema with Query, Mutation, and Subscription roots
+
+
+
+# Chat types
+
+
+
+
+type ChatMessage {
+  id: ID!
+  channelId: ID!
+  senderId: ID!
+  senderUsername: String!
+  senderDisplayName: String!
+  content: String!
+  createdAt: String!
+}
+
+type ChatMessageConnection {
+  items: [ChatMessage!]!
+  nextToken: String
+}
+
+type Conversation {
+  id: ID!
+  participantIds: [ID!]!
+  participants: [UserPublic!]!
+  lastMessage: ChatMessage
+  updatedAt: String!
+}
+
+# Game state types
+
+type GameState {
+  isSetActive: Boolean!
+  currentSetId: String
+  nextSetTime: String!
+  playerCount: Int!
+}
+
+# Ably token response
+type AblyTokenResponse {
+  token: String!
+  expires: String!
+}
+
+# Leaderboard types
+
+enum LeaderboardType {
+  DAILY
+  WEEKLY
+  ALL_TIME
+}
+
+type Leaderboard {
+  type: LeaderboardType!
+  entries: [LeaderboardEntry!]!
+  updatedAt: String!
+}
+
+type LeaderboardEntry {
+  rank: Int!
+  userId: ID!
+  username: String!
+  displayName: String!
+  score: Int!
+  avatarUrl: String
+  memberSince: String
+}
+
+# Question types
+
+type Question {
+  id: ID!
+  text: String!
+  options: [String!]!
+  correctIndex: Int!
+  category: String!
+  difficulty: String!
+  explanation: String
+}
+
+input CreateQuestionInput {
+  text: String!
+  options: [String!]!
+  correctIndex: Int!
+  category: String!
+  difficulty: String!
+  explanation: String
+}
+
+type QuestionConnection {
+  items: [Question!]!
+  nextToken: String
+}
+
+# User types
+
+type User {
+  id: ID!
+  email: String!
+  username: String!
+  displayName: String!
+  createdAt: String!
+  stats: UserStats!
+}
+
+type UserPublic {
+  id: ID!
+  username: String!
+  displayName: String!
+  stats: UserStats!
+}
+
+type UserStats {
+  totalCorrect: Int!
+  totalWrong: Int!
+  totalPoints: Int!
+  setsPlayed: Int!
+  setsWon: Int!
+  currentStreak: Int!
+  longestStreak: Int!
+}
+
+
+type Query {
+  # User queries
+  getMyProfile: User @aws_cognito_user_pools
+  getUserProfile(userId: ID!): UserPublic
+  checkScreenNameAvailable(screenName: String!): Boolean!
+  # Leaderboard queries
+  getLeaderboard(type: LeaderboardType!, limit: Int): Leaderboard
+  getMyRank(type: LeaderboardType!): Int @aws_cognito_user_pools
+  # Game state queries
+  getGameState: GameState
+  # Question queries (admin only)
+  listQuestions(limit: Int, nextToken: String): QuestionConnection @aws_cognito_user_pools
+  # Ably token for real-time
+  getAblyToken: AblyTokenResponse @aws_cognito_user_pools
+  # Chat queries
+  getChatMessages(channelId: ID!, limit: Int, nextToken: String): ChatMessageConnection @aws_cognito_user_pools
+  getMyConversations(limit: Int): [Conversation!]! @aws_cognito_user_pools
+}
+
+type Mutation {
+  # User mutations
+  updateDisplayName(displayName: String!): User @aws_cognito_user_pools
+  # Admin mutations
+  createQuestion(input: CreateQuestionInput!): Question @aws_cognito_user_pools
+  seedQuestions(questions: [CreateQuestionInput!]!): Int @aws_cognito_user_pools
+  # Chat mutations
+  sendChatMessage(channelId: ID!, content: String!): ChatMessage @aws_cognito_user_pools
+  startConversation(targetUserId: ID!): Conversation @aws_cognito_user_pools
+}
+
+type Subscription {
+  # Chat subscriptions
+  onNewChatMessage(channelId: ID!): ChatMessage @aws_subscribe(mutations: ["sendChatMessage"]) @aws_cognito_user_pools
+}

@@ -1,0 +1,16 @@
+# Game state types
+
+type GameState {
+  isSetActive: Boolean!
+  currentSetId: String
+  nextSetTime: String!
+  playerCount: Int!
+}
+
+# Ably token response
+type AblyTokenResponse {
+  token: String!
+  expires: String!
+  duplicateSession: Boolean
+  duplicateIp: Boolean
+}

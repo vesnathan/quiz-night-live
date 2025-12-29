@@ -1,0 +1,146 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Live Pub Quiz - DynamoDB Single Table"
+
+Parameters:
+  Stage:
+    Type: String
+    Description: Deployment stage
+  AppName:
+    Type: String
+    Description: Application Name
+    Default: wpq
+
+Resources:
+  # IAM Role for AppSync to access DynamoDB
+  AppSyncDynamoDBRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${AppName}-appsync-dynamodb-${Stage}
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: appsync.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: AppSyncDynamoDBAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:BatchGetItem
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:Query
+                  - dynamodb:Scan
+                Resource:
+                  - !GetAtt DataTable.Arn
+                  - !Sub "${DataTable.Arn}/index/*"
+      Tags:
+        - Key: Project
+          Value: live-pub-quiz
+
+  # Single-table design for Live Pub Quiz
+  # ============================================
+  # Access Patterns:
+  #
+  # USERS:
+  # 1. Get User Profile: PK=USER#{userId}, SK=PROFILE
+  # 2. Get User Stats: PK=USER#{userId}, SK=STATS
+  # 3. List all users: GSI1PK=USER, GSI1SK={createdAt}#{userId}
+  # 4. Username lookup: GSI2PK=USERNAME#{username}, GSI2SK=USER
+  #
+  # QUESTIONS:
+  # 5. Get Question: PK=QUESTION#{questionId}, SK=METADATA
+  # 6. List unused questions: GSI1PK=QUESTION#unused, GSI1SK={category}#{difficulty}
+  # 7. List questions by category: GSI1PK=QUESTION#{category}, GSI1SK={difficulty}
+  #
+  # SETS (Quiz Sessions):
+  # 8. Get Set: PK=SET#{setId}, SK=METADATA
+  # 9. Get Set Questions: PK=SET#{setId}, SK=QUESTION#{order}
+  # 10. Get Set Players: PK=SET#{setId}, SK=PLAYER#{userId}
+  # 11. List recent sets: GSI1PK=SET, GSI1SK={startTime}
+  #
+  # SCORES:
+  # 12. Get user's set score: PK=USER#{userId}, SK=SCORE#{setId}
+  # 13. Get set leaderboard: PK=SET#{setId}, SK=RANK#{rank}
+  #
+  # LEADERBOARDS:
+  # 14. Daily leaderboard: PK=LEADERBOARD#daily#{date}, SK=RANK#{rank}
+  # 15. Weekly leaderboard: PK=LEADERBOARD#weekly#{week}, SK=RANK#{rank}
+  # 16. All-time leaderboard: PK=LEADERBOARD#alltime, SK=RANK#{rank}
+  #
+  # GAME STATE:
+  # 17. Current game state: PK=GAME, SK=CURRENT_STATE
+  # 18. Player buzzes: PK=GAME#{setId}#{questionIndex}, SK=BUZZ#{timestamp}#{userId}
+  #
+  DataTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${AppName}-datatable-${Stage}"
+      AttributeDefinitions:
+        - AttributeName: "PK"
+          AttributeType: "S"
+        - AttributeName: "SK"
+          AttributeType: "S"
+        - AttributeName: "GSI1PK"
+          AttributeType: "S"
+        - AttributeName: "GSI1SK"
+          AttributeType: "S"
+        - AttributeName: "GSI2PK"
+          AttributeType: "S"
+        - AttributeName: "GSI2SK"
+          AttributeType: "S"
+      BillingMode: PAY_PER_REQUEST
+      KeySchema:
+        - AttributeName: "PK"
+          KeyType: "HASH"
+        - AttributeName: "SK"
+          KeyType: "RANGE"
+      GlobalSecondaryIndexes:
+        - IndexName: "GSI1"
+          KeySchema:
+            - AttributeName: "GSI1PK"
+              KeyType: "HASH"
+            - AttributeName: "GSI1SK"
+              KeyType: "RANGE"
+          Projection:
+            ProjectionType: "ALL"
+        - IndexName: "GSI2"
+          KeySchema:
+            - AttributeName: "GSI2PK"
+              KeyType: "HASH"
+            - AttributeName: "GSI2SK"
+              KeyType: "RANGE"
+          Projection:
+            ProjectionType: "ALL"
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+      Tags:
+        - Key: "Name"
+          Value: !Sub "${AppName}-datatable-${Stage}"
+        - Key: Project
+          Value: live-pub-quiz
+
+Outputs:
+  DataTableName:
+    Description: DynamoDB Data Table Name
+    Value: !Ref DataTable
+
+  DataTableArn:
+    Description: DynamoDB Data Table ARN
+    Value: !GetAtt DataTable.Arn
+
+  AppSyncDynamoDBRoleArn:
+    Description: AppSync DynamoDB Role ARN
+    Value: !GetAtt AppSyncDynamoDBRole.Arn
+
+  DataTableStreamArn:
+    Description: DynamoDB Stream ARN
+    Value: !GetAtt DataTable.StreamArn

@@ -1,0 +1,86 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Buzzer button styles */
+.buzzer-button {
+  @apply relative w-48 h-48 rounded-full transition-all duration-100;
+  @apply flex items-center justify-center;
+  @apply text-white font-bold text-2xl uppercase tracking-wider;
+  @apply shadow-lg;
+}
+
+.buzzer-button.ready {
+  @apply bg-buzzer-ready hover:bg-green-600 active:bg-green-700;
+  @apply hover:scale-105 active:scale-95;
+  @apply cursor-pointer;
+}
+
+.buzzer-button.pressed {
+  @apply bg-buzzer-pressed;
+  @apply scale-95;
+  @apply cursor-not-allowed;
+}
+
+.buzzer-button.disabled {
+  @apply bg-buzzer-disabled;
+  @apply cursor-not-allowed opacity-50;
+}
+
+/* Score display */
+.score-positive {
+  @apply text-green-500;
+}
+
+.score-negative {
+  @apply text-red-500;
+}
+
+/* Timer bar */
+.timer-bar {
+  @apply h-2 bg-primary-500 transition-all duration-100;
+}
+
+.timer-bar.urgent {
+  @apply bg-red-500 animate-pulse-fast;
+}
+
+/* Leaderboard */
+.leaderboard-entry {
+  @apply flex items-center justify-between p-3 rounded-lg;
+  @apply transition-all duration-200;
+}
+
+.leaderboard-entry:hover {
+  @apply bg-gray-100 dark:bg-gray-800;
+}
+
+.leaderboard-entry.current-user {
+  @apply bg-primary-100 dark:bg-primary-900;
+}
+
+/* Answer options */
+.answer-option {
+  @apply p-4 rounded-lg border-2 transition-all duration-200;
+  @apply cursor-pointer;
+}
+
+.answer-option:hover:not(.disabled) {
+  @apply border-primary-500 bg-primary-50 dark:bg-primary-900;
+}
+
+.answer-option.selected {
+  @apply border-primary-600 bg-primary-100 dark:bg-primary-900;
+}
+
+.answer-option.correct {
+  @apply border-green-500 bg-green-100 dark:bg-green-900;
+}
+
+.answer-option.incorrect {
+  @apply border-red-500 bg-red-100 dark:bg-red-900;
+}
+
+.answer-option.disabled {
+  @apply cursor-not-allowed opacity-50;
+}

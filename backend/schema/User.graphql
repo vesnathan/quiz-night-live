@@ -1,0 +1,27 @@
+# User types
+
+type User {
+  id: ID!
+  email: String!
+  username: String!
+  displayName: String!
+  createdAt: String!
+  stats: UserStats!
+}
+
+type UserPublic {
+  id: ID!
+  username: String!
+  displayName: String!
+  stats: UserStats!
+}
+
+type UserStats {
+  totalCorrect: Int!
+  totalWrong: Int!
+  totalPoints: Int!
+  setsPlayed: Int!
+  setsWon: Int!
+  currentStreak: Int!
+  longestStreak: Int!
+}

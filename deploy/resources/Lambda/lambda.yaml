@@ -1,0 +1,162 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Live Pub Quiz - Lambda Functions"
+
+Parameters:
+  Stage:
+    Type: String
+    Description: Deployment stage
+  AppName:
+    Type: String
+    Description: Application Name
+  TemplateBucketName:
+    Type: String
+    Description: S3 bucket for Lambda code
+  DataTableName:
+    Type: String
+    Description: DynamoDB table name
+  DataTableArn:
+    Type: String
+    Description: DynamoDB table ARN
+  UserPoolId:
+    Type: String
+    Description: Cognito User Pool ID
+  LogRetentionInDays:
+    Type: Number
+    Description: CloudWatch log retention
+    Default: 14
+  AblyApiKey:
+    Type: String
+    Description: Ably API key
+    NoEcho: true
+
+Resources:
+  # Ably Token Auth Lambda - generates Ably tokens for authenticated users
+  # Also handles anti-cheat session tracking (stores sessions in DynamoDB)
+  GetAblyTokenFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${AppName}-get-ably-token-${Stage}"
+      Runtime: nodejs20.x
+      Handler: index.handler
+      Role: !GetAtt GetAblyTokenRole.Arn
+      Timeout: 10
+      Environment:
+        Variables:
+          ABLY_API_KEY: !Ref AblyApiKey
+          TABLE_NAME: !Ref DataTableName
+      Code:
+        S3Bucket: !Ref TemplateBucketName
+        S3Key: !Sub "functions/${Stage}/getAblyToken.zip"
+      Tags:
+        - Key: Project
+          Value: live-pub-quiz
+
+  GetAblyTokenRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${AppName}-get-ably-token-role-${Stage}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: DynamoDBAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:Query
+                Resource:
+                  - !Ref DataTableArn
+                  - !Sub "${DataTableArn}/index/*"
+      Tags:
+        - Key: Project
+          Value: live-pub-quiz
+
+  GetAblyTokenLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${AppName}-get-ably-token-${Stage}"
+      RetentionInDays: !Ref LogRetentionInDays
+      Tags:
+        - Key: Project
+          Value: live-pub-quiz
+
+  # Ensure Profile Lambda - creates profiles for OAuth users on first login
+  EnsureProfileFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${AppName}-ensure-profile-${Stage}"
+      Runtime: nodejs20.x
+      Handler: index.handler
+      Role: !GetAtt EnsureProfileRole.Arn
+      Timeout: 10
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref DataTableName
+      Code:
+        S3Bucket: !Ref TemplateBucketName
+        S3Key: !Sub "functions/${Stage}/ensureProfile.zip"
+      Tags:
+        - Key: Project
+          Value: live-pub-quiz
+
+  EnsureProfileRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${AppName}-ensure-profile-role-${Stage}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: DynamoDBAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:Query
+                Resource:
+                  - !Ref DataTableArn
+                  - !Sub "${DataTableArn}/index/*"
+      Tags:
+        - Key: Project
+          Value: live-pub-quiz
+
+  EnsureProfileLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${AppName}-ensure-profile-${Stage}"
+      RetentionInDays: !Ref LogRetentionInDays
+      Tags:
+        - Key: Project
+          Value: live-pub-quiz
+
+  # Note: Orchestrator is now running on Fargate, not Lambda
+  # See deploy/resources/Fargate/fargate.yaml
+
+Outputs:
+  GetAblyTokenFunctionArn:
+    Description: Get Ably Token Lambda ARN
+    Value: !GetAtt GetAblyTokenFunction.Arn
+
+  EnsureProfileFunctionArn:
+    Description: Ensure Profile Lambda ARN
+    Value: !GetAtt EnsureProfileFunction.Arn

@@ -1,0 +1,23 @@
+# Leaderboard types
+
+enum LeaderboardType {
+  DAILY
+  WEEKLY
+  ALL_TIME
+}
+
+type Leaderboard {
+  type: LeaderboardType!
+  entries: [LeaderboardEntry!]!
+  updatedAt: String!
+}
+
+type LeaderboardEntry {
+  rank: Int!
+  userId: ID!
+  username: String!
+  displayName: String!
+  score: Int!
+  avatarUrl: String
+  memberSince: String
+}

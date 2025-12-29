@@ -1,0 +1,25 @@
+# Question types
+
+type Question {
+  id: ID!
+  text: String!
+  options: [String!]!
+  correctIndex: Int!
+  category: String!
+  difficulty: String!
+  explanation: String
+}
+
+input CreateQuestionInput {
+  text: String!
+  options: [String!]!
+  correctIndex: Int!
+  category: String!
+  difficulty: String!
+  explanation: String
+}
+
+type QuestionConnection {
+  items: [Question!]!
+  nextToken: String
+}

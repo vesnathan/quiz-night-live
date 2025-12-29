@@ -1,0 +1,26 @@
+{
+  "name": "live-pub-quiz",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "shared",
+    "frontend",
+    "backend",
+    "deploy"
+  ],
+  "scripts": {
+    "dev": "yarn workspace quiz-frontend dev",
+    "build": "yarn workspace quiz-frontend build",
+    "build-gql": "yarn workspace quiz-frontend build-gql",
+    "lint": "yarn workspace quiz-frontend lint",
+    "tsc": "yarn workspace quiz-frontend tsc --noEmit",
+    "test": "yarn workspaces foreach --all run test",
+    "deploy": "yarn workspace @quiz/deploy deploy",
+    "deploy:dev": "yarn workspace @quiz/deploy deploy:dev",
+    "deploy:prod": "yarn workspace @quiz/deploy deploy:prod",
+    "seed": "yarn workspace @quiz/deploy seed"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4"
+  }
+}

@@ -1,0 +1,459 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Live Pub Quiz - AppSync GraphQL API"
+
+Parameters:
+  Stage:
+    Type: String
+    Description: Deployment stage
+  AppName:
+    Type: String
+    Description: Application Name
+  TemplateBucketName:
+    Type: String
+    Description: S3 bucket for templates
+  UserPoolId:
+    Type: String
+    Description: Cognito User Pool ID
+  DataTableName:
+    Type: String
+    Description: DynamoDB table name
+  AppSyncDynamoDBRoleArn:
+    Type: String
+    Description: IAM Role ARN for AppSync to access DynamoDB
+  LogRetentionInDays:
+    Type: Number
+    Description: CloudWatch log retention
+    Default: 14
+  GetAblyTokenFunctionArn:
+    Type: String
+    Description: Get Ably Token Lambda ARN
+  EnsureProfileFunctionArn:
+    Type: String
+    Description: Ensure Profile Lambda ARN
+  ResolversBuildHash:
+    Type: String
+    Description: Build hash for resolver versioning
+
+Resources:
+  # AppSync GraphQL API
+  GraphQLApi:
+    Type: AWS::AppSync::GraphQLApi
+    Properties:
+      Name: !Sub "${AppName}-api-${Stage}"
+      AuthenticationType: AMAZON_COGNITO_USER_POOLS
+      UserPoolConfig:
+        UserPoolId: !Ref UserPoolId
+        AwsRegion: !Ref AWS::Region
+        DefaultAction: ALLOW
+      AdditionalAuthenticationProviders:
+        - AuthenticationType: AWS_IAM
+      XrayEnabled: true
+      LogConfig:
+        CloudWatchLogsRoleArn: !GetAtt AppSyncLogsRole.Arn
+        ExcludeVerboseContent: false
+        FieldLogLevel: ERROR
+      Tags:
+        - Key: Project
+          Value: live-pub-quiz
+        - Key: Stage
+          Value: !Ref Stage
+
+  # GraphQL Schema
+  GraphQLSchema:
+    Type: AWS::AppSync::GraphQLSchema
+    Properties:
+      ApiId: !GetAtt GraphQLApi.ApiId
+      Definition: |
+        type Query {
+          # User queries
+          getMyProfile: User @aws_cognito_user_pools
+          getUserProfile(userId: ID!): UserPublic
+          checkDisplayNameAvailable(displayName: String!): Boolean! @aws_iam
+
+          # Leaderboard queries
+          getLeaderboard(type: LeaderboardType!, limit: Int): Leaderboard
+          getMyRank(type: LeaderboardType!): Int @aws_cognito_user_pools
+
+          # Game state queries
+          getGameState: GameState
+
+          # Question queries (admin only)
+          listQuestions(limit: Int, nextToken: String): QuestionConnection @aws_cognito_user_pools
+
+          # Ably token for real-time
+          getAblyToken: AblyTokenResponse @aws_cognito_user_pools
+
+          # Chat queries
+          getChatMessages(channelId: ID!, limit: Int, nextToken: String): ChatMessageConnection @aws_cognito_user_pools
+          getMyConversations(limit: Int): [Conversation!]! @aws_cognito_user_pools
+        }
+
+        type Mutation {
+          # User mutations
+          updateDisplayName(displayName: String!): User @aws_cognito_user_pools
+          ensureProfile(displayName: String!): User @aws_cognito_user_pools
+
+          # Admin mutations
+          createQuestion(input: CreateQuestionInput!): Question @aws_cognito_user_pools
+          seedQuestions(questions: [CreateQuestionInput!]!): Int @aws_cognito_user_pools
+
+          # Chat mutations
+          sendChatMessage(channelId: ID!, content: String!): ChatMessage @aws_cognito_user_pools
+          startConversation(targetUserId: ID!): Conversation @aws_cognito_user_pools
+        }
+
+        type Subscription {
+          # Chat subscriptions
+          onNewChatMessage(channelId: ID!): ChatMessage @aws_subscribe(mutations: ["sendChatMessage"]) @aws_cognito_user_pools
+        }
+
+        # User types
+        type User {
+          id: ID!
+          email: String!
+          displayName: String!
+          createdAt: String!
+          stats: UserStats!
+        }
+
+        type UserPublic {
+          id: ID!
+          displayName: String!
+          stats: UserStats!
+        }
+
+        type UserStats {
+          totalCorrect: Int!
+          totalWrong: Int!
+          totalPoints: Int!
+          setsPlayed: Int!
+          setsWon: Int!
+          currentStreak: Int!
+          longestStreak: Int!
+        }
+
+        # Leaderboard types
+        enum LeaderboardType {
+          DAILY
+          WEEKLY
+          ALL_TIME
+        }
+
+        type Leaderboard {
+          type: LeaderboardType!
+          entries: [LeaderboardEntry!]!
+          updatedAt: String!
+        }
+
+        type LeaderboardEntry {
+          rank: Int!
+          userId: ID!
+          displayName: String!
+          score: Int!
+        }
+
+        # Game state types
+        type GameState {
+          isSetActive: Boolean!
+          currentSetId: String
+          nextSetTime: String!
+          playerCount: Int!
+        }
+
+        # Question types
+        type Question {
+          id: ID!
+          text: String!
+          options: [String!]!
+          correctIndex: Int!
+          category: String!
+          difficulty: String!
+          explanation: String
+        }
+
+        input CreateQuestionInput {
+          text: String!
+          options: [String!]!
+          correctIndex: Int!
+          category: String!
+          difficulty: String!
+          explanation: String
+        }
+
+        type QuestionConnection {
+          items: [Question!]!
+          nextToken: String
+        }
+
+        # Ably token response
+        type AblyTokenResponse {
+          token: String!
+          expires: String!
+          duplicateSession: Boolean
+          duplicateIp: Boolean
+        }
+
+        # Chat types
+        type ChatMessage {
+          id: ID!
+          channelId: ID!
+          senderId: ID!
+          senderUsername: String!
+          senderDisplayName: String!
+          content: String!
+          createdAt: String!
+        }
+
+        type ChatMessageConnection {
+          items: [ChatMessage!]!
+          nextToken: String
+        }
+
+        type Conversation {
+          id: ID!
+          participantIds: [ID!]!
+          participants: [UserPublic!]!
+          lastMessage: ChatMessage
+          updatedAt: String!
+        }
+
+  # DynamoDB Data Source
+  DynamoDBDataSource:
+    Type: AWS::AppSync::DataSource
+    Properties:
+      ApiId: !GetAtt GraphQLApi.ApiId
+      Name: DynamoDBDataSource
+      Type: AMAZON_DYNAMODB
+      ServiceRoleArn: !Ref AppSyncDynamoDBRoleArn
+      DynamoDBConfig:
+        AwsRegion: !Ref AWS::Region
+        TableName: !Ref DataTableName
+
+  # Lambda Data Source for Ably Token
+  AblyTokenDataSource:
+    Type: AWS::AppSync::DataSource
+    Properties:
+      ApiId: !GetAtt GraphQLApi.ApiId
+      Name: AblyTokenDataSource
+      Type: AWS_LAMBDA
+      ServiceRoleArn: !GetAtt AppSyncLambdaRole.Arn
+      LambdaConfig:
+        LambdaFunctionArn: !Ref GetAblyTokenFunctionArn
+
+  # Lambda Data Source for Ensure Profile
+  EnsureProfileDataSource:
+    Type: AWS::AppSync::DataSource
+    Properties:
+      ApiId: !GetAtt GraphQLApi.ApiId
+      Name: EnsureProfileDataSource
+      Type: AWS_LAMBDA
+      ServiceRoleArn: !GetAtt AppSyncLambdaRole.Arn
+      LambdaConfig:
+        LambdaFunctionArn: !Ref EnsureProfileFunctionArn
+
+  # Resolvers
+  GetMyProfileResolver:
+    Type: AWS::AppSync::Resolver
+    DependsOn: GraphQLSchema
+    Properties:
+      ApiId: !GetAtt GraphQLApi.ApiId
+      TypeName: Query
+      FieldName: getMyProfile
+      DataSourceName: !GetAtt DynamoDBDataSource.Name
+      Kind: UNIT
+      Runtime:
+        Name: APPSYNC_JS
+        RuntimeVersion: "1.0.0"
+      CodeS3Location: !Sub "s3://${TemplateBucketName}/resolvers/${Stage}/${ResolversBuildHash}/users/Queries/Query.getMyProfile.js"
+
+  GetUserProfileResolver:
+    Type: AWS::AppSync::Resolver
+    DependsOn: GraphQLSchema
+    Properties:
+      ApiId: !GetAtt GraphQLApi.ApiId
+      TypeName: Query
+      FieldName: getUserProfile
+      DataSourceName: !GetAtt DynamoDBDataSource.Name
+      Kind: UNIT
+      Runtime:
+        Name: APPSYNC_JS
+        RuntimeVersion: "1.0.0"
+      CodeS3Location: !Sub "s3://${TemplateBucketName}/resolvers/${Stage}/${ResolversBuildHash}/users/Queries/Query.getUserProfile.js"
+
+  CheckDisplayNameAvailableResolver:
+    Type: AWS::AppSync::Resolver
+    DependsOn: GraphQLSchema
+    Properties:
+      ApiId: !GetAtt GraphQLApi.ApiId
+      TypeName: Query
+      FieldName: checkDisplayNameAvailable
+      DataSourceName: !GetAtt DynamoDBDataSource.Name
+      Kind: UNIT
+      Runtime:
+        Name: APPSYNC_JS
+        RuntimeVersion: "1.0.0"
+      CodeS3Location: !Sub "s3://${TemplateBucketName}/resolvers/${Stage}/${ResolversBuildHash}/users/Queries/Query.checkDisplayNameAvailable.js"
+
+  GetLeaderboardResolver:
+    Type: AWS::AppSync::Resolver
+    DependsOn: GraphQLSchema
+    Properties:
+      ApiId: !GetAtt GraphQLApi.ApiId
+      TypeName: Query
+      FieldName: getLeaderboard
+      DataSourceName: !GetAtt DynamoDBDataSource.Name
+      Kind: UNIT
+      Runtime:
+        Name: APPSYNC_JS
+        RuntimeVersion: "1.0.0"
+      CodeS3Location: !Sub "s3://${TemplateBucketName}/resolvers/${Stage}/${ResolversBuildHash}/leaderboard/Queries/Query.getLeaderboard.js"
+
+  GetAblyTokenResolver:
+    Type: AWS::AppSync::Resolver
+    DependsOn: GraphQLSchema
+    Properties:
+      ApiId: !GetAtt GraphQLApi.ApiId
+      TypeName: Query
+      FieldName: getAblyToken
+      DataSourceName: !GetAtt AblyTokenDataSource.Name
+      Kind: UNIT
+      Runtime:
+        Name: APPSYNC_JS
+        RuntimeVersion: "1.0.0"
+      CodeS3Location: !Sub "s3://${TemplateBucketName}/resolvers/${Stage}/${ResolversBuildHash}/ably/Queries/Query.getAblyToken.js"
+
+  UpdateDisplayNameResolver:
+    Type: AWS::AppSync::Resolver
+    DependsOn: GraphQLSchema
+    Properties:
+      ApiId: !GetAtt GraphQLApi.ApiId
+      TypeName: Mutation
+      FieldName: updateDisplayName
+      DataSourceName: !GetAtt DynamoDBDataSource.Name
+      Kind: UNIT
+      Runtime:
+        Name: APPSYNC_JS
+        RuntimeVersion: "1.0.0"
+      CodeS3Location: !Sub "s3://${TemplateBucketName}/resolvers/${Stage}/${ResolversBuildHash}/users/Mutations/Mutation.updateDisplayName.js"
+
+  EnsureProfileResolver:
+    Type: AWS::AppSync::Resolver
+    DependsOn: GraphQLSchema
+    Properties:
+      ApiId: !GetAtt GraphQLApi.ApiId
+      TypeName: Mutation
+      FieldName: ensureProfile
+      DataSourceName: !GetAtt EnsureProfileDataSource.Name
+      Kind: UNIT
+      Runtime:
+        Name: APPSYNC_JS
+        RuntimeVersion: "1.0.0"
+      CodeS3Location: !Sub "s3://${TemplateBucketName}/resolvers/${Stage}/${ResolversBuildHash}/profile/Mutations/Mutation.ensureProfile.js"
+
+  # Chat Resolvers
+  GetChatMessagesResolver:
+    Type: AWS::AppSync::Resolver
+    DependsOn: GraphQLSchema
+    Properties:
+      ApiId: !GetAtt GraphQLApi.ApiId
+      TypeName: Query
+      FieldName: getChatMessages
+      DataSourceName: !GetAtt DynamoDBDataSource.Name
+      Kind: UNIT
+      Runtime:
+        Name: APPSYNC_JS
+        RuntimeVersion: "1.0.0"
+      CodeS3Location: !Sub "s3://${TemplateBucketName}/resolvers/${Stage}/${ResolversBuildHash}/chat/Queries/Query.getChatMessages.js"
+
+  GetMyConversationsResolver:
+    Type: AWS::AppSync::Resolver
+    DependsOn: GraphQLSchema
+    Properties:
+      ApiId: !GetAtt GraphQLApi.ApiId
+      TypeName: Query
+      FieldName: getMyConversations
+      DataSourceName: !GetAtt DynamoDBDataSource.Name
+      Kind: UNIT
+      Runtime:
+        Name: APPSYNC_JS
+        RuntimeVersion: "1.0.0"
+      CodeS3Location: !Sub "s3://${TemplateBucketName}/resolvers/${Stage}/${ResolversBuildHash}/chat/Queries/Query.getMyConversations.js"
+
+  SendChatMessageResolver:
+    Type: AWS::AppSync::Resolver
+    DependsOn: GraphQLSchema
+    Properties:
+      ApiId: !GetAtt GraphQLApi.ApiId
+      TypeName: Mutation
+      FieldName: sendChatMessage
+      DataSourceName: !GetAtt DynamoDBDataSource.Name
+      Kind: UNIT
+      Runtime:
+        Name: APPSYNC_JS
+        RuntimeVersion: "1.0.0"
+      CodeS3Location: !Sub "s3://${TemplateBucketName}/resolvers/${Stage}/${ResolversBuildHash}/chat/Mutations/Mutation.sendChatMessage.js"
+
+  StartConversationResolver:
+    Type: AWS::AppSync::Resolver
+    DependsOn: GraphQLSchema
+    Properties:
+      ApiId: !GetAtt GraphQLApi.ApiId
+      TypeName: Mutation
+      FieldName: startConversation
+      DataSourceName: !GetAtt DynamoDBDataSource.Name
+      Kind: UNIT
+      Runtime:
+        Name: APPSYNC_JS
+        RuntimeVersion: "1.0.0"
+      CodeS3Location: !Sub "s3://${TemplateBucketName}/resolvers/${Stage}/${ResolversBuildHash}/chat/Mutations/Mutation.startConversation.js"
+
+  # IAM Role for AppSync to invoke Lambda
+  AppSyncLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${AppName}-appsync-lambda-${Stage}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: appsync.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: InvokeLambda
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource:
+                  - !Ref GetAblyTokenFunctionArn
+                  - !Ref EnsureProfileFunctionArn
+
+  # IAM Role for AppSync CloudWatch Logs
+  AppSyncLogsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${AppName}-appsync-logs-${Stage}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: appsync.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSAppSyncPushToCloudWatchLogs
+
+Outputs:
+  AppSyncApiUrl:
+    Description: AppSync API URL
+    Value: !GetAtt GraphQLApi.GraphQLUrl
+
+  AppSyncApiId:
+    Description: AppSync API ID
+    Value: !GetAtt GraphQLApi.ApiId
+
+  AppSyncApiArn:
+    Description: AppSync API ARN
+    Value: !GetAtt GraphQLApi.Arn

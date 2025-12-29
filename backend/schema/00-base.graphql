@@ -1,0 +1,30 @@
+# Base schema with Query, Mutation, and Subscription roots
+
+type Query {
+  # User queries
+  getMyProfile: User @aws_cognito_user_pools
+  getUserProfile(userId: ID!): UserPublic
+  checkScreenNameAvailable(screenName: String!): Boolean!
+
+  # Leaderboard queries
+  getLeaderboard(type: LeaderboardType!, limit: Int): Leaderboard
+  getMyRank(type: LeaderboardType!): Int @aws_cognito_user_pools
+
+  # Game state queries
+  getGameState: GameState
+
+  # Question queries (admin only)
+  listQuestions(limit: Int, nextToken: String): QuestionConnection @aws_cognito_user_pools
+
+  # Ably token for real-time
+  getAblyToken: AblyTokenResponse @aws_cognito_user_pools
+}
+
+type Mutation {
+  # User mutations
+  updateDisplayName(displayName: String!): User @aws_cognito_user_pools
+
+  # Admin mutations
+  createQuestion(input: CreateQuestionInput!): Question @aws_cognito_user_pools
+  seedQuestions(questions: [CreateQuestionInput!]!): Int @aws_cognito_user_pools
+}

@@ -1,0 +1,51 @@
+{
+  "name": "quiz-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "prettier --write '**/*.{ts,tsx,js,jsx}' && next lint",
+    "tsc": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "build-gql": "npx ts-node -P ./tsconfig.scripts.json ./scripts/buildGql.ts"
+  },
+  "dependencies": {
+    "@aws-amplify/ui-react": "^6.13.2",
+    "@nextui-org/react": "^2.4.6",
+    "@quiz/shared": "*",
+    "@tanstack/react-query": "^5.61.3",
+    "ably": "^2.0.0",
+    "aws-amplify": "^6.15.9",
+    "framer-motion": "^11.11.11",
+    "graphql": "^16.12.0",
+    "next": "^14.0.4",
+    "next-themes": "^0.4.4",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "tailwindcss": "^3.4.14",
+    "zod": "^3.23.8",
+    "zustand": "^4.5.1"
+  },
+  "devDependencies": {
+    "@graphql-codegen/cli": "^5.0.0",
+    "@graphql-codegen/typescript": "^4.0.0",
+    "@graphql-codegen/typescript-operations": "^4.0.0",
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "autoprefixer": "^10.4.20",
+    "eslint": "^8",
+    "eslint-config-next": "^14.0.4",
+    "eslint-config-prettier": "^10.0.0",
+    "postcss": "^8.4.47",
+    "prettier": "^3.2.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.5.4",
+    "vitest": "^1.6.0"
+  }
+}

@@ -1,0 +1,329 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Live Pub Quiz - Fargate Orchestrator"
+
+Parameters:
+  Stage:
+    Type: String
+    Description: Deployment stage
+  AppName:
+    Type: String
+    Description: Application Name
+  DataTableName:
+    Type: String
+    Description: DynamoDB table name
+  DataTableArn:
+    Type: String
+    Description: DynamoDB table ARN
+  AblyApiKey:
+    Type: String
+    Description: Ably API key
+    NoEcho: true
+  LogRetentionInDays:
+    Type: Number
+    Description: CloudWatch log retention
+    Default: 14
+
+Resources:
+  # VPC for Fargate (using default VPC via public subnets)
+  # For production, you may want a dedicated VPC
+
+  # ECS Cluster
+  OrchestratorCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Sub "${AppName}-orchestrator-${Stage}"
+      ClusterSettings:
+        - Name: containerInsights
+          Value: enabled
+      Tags:
+        - Key: Project
+          Value: live-pub-quiz
+        - Key: Stage
+          Value: !Ref Stage
+
+  # ECR Repository for the orchestrator image
+  OrchestratorRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Sub "${AppName}-orchestrator-${Stage}"
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Keep only last 5 images",
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 5
+                },
+                "action": {
+                  "type": "expire"
+                }
+              }
+            ]
+          }
+      Tags:
+        - Key: Project
+          Value: live-pub-quiz
+
+  # CloudWatch Log Group for Fargate
+  OrchestratorLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/ecs/${AppName}-orchestrator-${Stage}"
+      RetentionInDays: !Ref LogRetentionInDays
+      Tags:
+        - Key: Project
+          Value: live-pub-quiz
+
+  # IAM Role for ECS Task Execution (pulling images, logging)
+  TaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${AppName}-orchestrator-execution-${Stage}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+      Tags:
+        - Key: Project
+          Value: live-pub-quiz
+
+  # IAM Role for the Task itself (DynamoDB access, etc.)
+  TaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${AppName}-orchestrator-task-${Stage}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: DynamoDBAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:Query
+                  - dynamodb:Scan
+                  - dynamodb:BatchWriteItem
+                Resource:
+                  - !Ref DataTableArn
+                  - !Sub "${DataTableArn}/index/*"
+        - PolicyName: SecretsManagerAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource:
+                  - !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:quiz-app/anthropic-api-key*"
+      Tags:
+        - Key: Project
+          Value: live-pub-quiz
+
+  # ECS Task Definition
+  OrchestratorTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub "${AppName}-orchestrator-${Stage}"
+      Cpu: "512"
+      Memory: "1024"
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      ExecutionRoleArn: !GetAtt TaskExecutionRole.Arn
+      TaskRoleArn: !GetAtt TaskRole.Arn
+      ContainerDefinitions:
+        - Name: orchestrator
+          Image: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${OrchestratorRepository}:latest"
+          Essential: true
+          Environment:
+            - Name: TABLE_NAME
+              Value: !Ref DataTableName
+            - Name: ABLY_API_KEY
+              Value: !Ref AblyApiKey
+            - Name: STAGE
+              Value: !Ref Stage
+            - Name: AWS_REGION
+              Value: !Ref AWS::Region
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref OrchestratorLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: orchestrator
+          HealthCheck:
+            Command:
+              - CMD-SHELL
+              - "curl -f http://localhost:8080/health || exit 1"
+            Interval: 30
+            Timeout: 10
+            Retries: 3
+            StartPeriod: 120
+      Tags:
+        - Key: Project
+          Value: live-pub-quiz
+
+  # Security Group for Fargate tasks
+  OrchestratorSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub "${AppName}-orchestrator-sg-${Stage}"
+      GroupDescription: Security group for orchestrator Fargate tasks
+      VpcId: !Ref VPC
+      # Egress only - orchestrator doesn't need inbound traffic
+      SecurityGroupEgress:
+        - IpProtocol: "-1"
+          CidrIp: 0.0.0.0/0
+          Description: Allow all outbound traffic
+      Tags:
+        - Key: Project
+          Value: live-pub-quiz
+        - Key: Name
+          Value: !Sub "${AppName}-orchestrator-sg-${Stage}"
+
+  # ECS Service (runs the task continuously)
+  # Note: DesiredCount starts at 0 - the deploy script will scale up after pushing the image
+  OrchestratorService:
+    Type: AWS::ECS::Service
+    Properties:
+      ServiceName: !Sub "${AppName}-orchestrator-${Stage}"
+      Cluster: !Ref OrchestratorCluster
+      TaskDefinition: !Ref OrchestratorTaskDefinition
+      DesiredCount: 0
+      LaunchType: FARGATE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          SecurityGroups:
+            - !Ref OrchestratorSecurityGroup
+          Subnets:
+            - !Ref PublicSubnet1
+            - !Ref PublicSubnet2
+      DeploymentConfiguration:
+        MinimumHealthyPercent: 0
+        MaximumPercent: 100
+      EnableExecuteCommand: true
+      Tags:
+        - Key: Project
+          Value: live-pub-quiz
+
+  # VPC Resources (minimal VPC for Fargate)
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${AppName}-vpc-${Stage}"
+        - Key: Project
+          Value: live-pub-quiz
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub "${AppName}-igw-${Stage}"
+        - Key: Project
+          Value: live-pub-quiz
+
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.1.0/24
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${AppName}-public-1-${Stage}"
+        - Key: Project
+          Value: live-pub-quiz
+
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.2.0/24
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${AppName}-public-2-${Stage}"
+        - Key: Project
+          Value: live-pub-quiz
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${AppName}-public-rt-${Stage}"
+        - Key: Project
+          Value: live-pub-quiz
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: AttachGateway
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  Subnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet1
+      RouteTableId: !Ref PublicRouteTable
+
+  Subnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet2
+      RouteTableId: !Ref PublicRouteTable
+
+Outputs:
+  ClusterName:
+    Description: ECS Cluster Name
+    Value: !Ref OrchestratorCluster
+
+  ServiceName:
+    Description: ECS Service Name
+    Value: !GetAtt OrchestratorService.Name
+
+  RepositoryUri:
+    Description: ECR Repository URI
+    Value: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${OrchestratorRepository}"
+
+  LogGroupName:
+    Description: CloudWatch Log Group
+    Value: !Ref OrchestratorLogGroup

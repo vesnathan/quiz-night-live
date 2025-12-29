@@ -1,0 +1,36 @@
+{
+  "name": "quiz-backend",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "@aws-appsync/utils": "^1.1.1",
+    "@aws-sdk/client-dynamodb": "^3.669.0",
+    "@aws-sdk/lib-dynamodb": "^3.669.0",
+    "@aws-sdk/client-cognito-identity-provider": "^3.669.0",
+    "@aws-sdk/client-secrets-manager": "^3.669.0",
+    "@anthropic-ai/sdk": "^0.24.0",
+    "ably": "^2.0.0",
+    "express": "^4.21.0",
+    "uuid": "^9.0.0",
+    "@quiz/shared": "*"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.158",
+    "@types/express": "^4.17.21",
+    "@types/node": "^20",
+    "@types/uuid": "^9.0.0",
+    "esbuild": "^0.20.0",
+    "tsx": "^4.20.6",
+    "typescript": "^5.5.4",
+    "vitest": "^1.6.0"
+  },
+  "scripts": {
+    "build": "node scripts/build.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "seed": "tsx scripts/seed.ts",
+    "generate-questions": "tsx scripts/generate-questions.ts",
+    "orchestrator": "tsx src/orchestrator/index.ts",
+    "orchestrator:dev": "tsx watch src/orchestrator/index.ts"
+  }
+}

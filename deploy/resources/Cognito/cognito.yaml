@@ -1,0 +1,532 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Live Pub Quiz - Cognito User Pool"
+
+Parameters:
+  Stage:
+    Type: String
+    Description: Deployment stage
+  AppName:
+    Type: String
+    Description: Application short name
+  TemplateBucketName:
+    Type: String
+    Description: S3 bucket name for CloudFormation templates
+  DataTableName:
+    Type: String
+    Description: DynamoDB table name
+  LogRetentionInDays:
+    Type: Number
+    Description: Number of days to retain CloudWatch Logs
+    Default: 14
+  GoogleClientId:
+    Type: String
+    Description: Google OAuth Client ID
+    Default: ""
+  GoogleClientSecret:
+    Type: String
+    Description: Google OAuth Client Secret
+    NoEcho: true
+    Default: ""
+  FrontendUrl:
+    Type: String
+    Description: Frontend URL for OAuth callbacks
+    Default: "http://localhost:3000"
+  AuthDomainName:
+    Type: String
+    Description: Custom domain for Cognito OAuth (e.g., auth.quiznight.live)
+    Default: ""
+  AuthDomainCertificateArn:
+    Type: String
+    Description: ACM Certificate ARN in us-east-1 for auth domain
+    Default: ""
+  HostedZoneId:
+    Type: String
+    Description: Route53 Hosted Zone ID for DNS records
+    Default: ""
+
+Conditions:
+  HasGoogleOAuth: !And
+    - !Not [!Equals [!Ref GoogleClientId, ""]]
+    - !Not [!Equals [!Ref GoogleClientSecret, ""]]
+  HasCustomAuthDomain: !Not [!Equals [!Ref AuthDomainName, ""]]
+  NoCustomAuthDomain: !Equals [!Ref AuthDomainName, ""]
+  # Combined conditions for the 4 possible scenarios:
+  # 1. No Google, No Custom Domain
+  NoGoogleNoCustomDomain: !And
+    - !Condition NoCustomAuthDomain
+    - !Not [!Condition HasGoogleOAuth]
+  # 2. Google, No Custom Domain
+  GoogleNoCustomDomain: !And
+    - !Condition NoCustomAuthDomain
+    - !Condition HasGoogleOAuth
+  # 3. No Google, Custom Domain
+  NoGoogleCustomDomain: !And
+    - !Condition HasCustomAuthDomain
+    - !Not [!Condition HasGoogleOAuth]
+  # 4. Google + Custom Domain
+  GoogleCustomDomain: !And
+    - !Condition HasCustomAuthDomain
+    - !Condition HasGoogleOAuth
+
+Resources:
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    DependsOn:
+      - CognitoPreSignUpPermission
+    Properties:
+      UserPoolName: !Sub "${AppName}-userpool-${Stage}"
+      Schema:
+        - Name: email
+          AttributeDataType: String
+          Mutable: true
+          Required: true
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+      AutoVerifiedAttributes:
+        - email
+      UsernameAttributes:
+        - email
+      UsernameConfiguration:
+        CaseSensitive: false
+      LambdaConfig:
+        PreSignUp: !GetAtt CognitoPreSignUpFunction.Arn
+        PostConfirmation: !GetAtt CognitoPostConfirmationFunction.Arn
+      UserPoolTags:
+        Project: live-pub-quiz
+        Stage: !Ref Stage
+
+  UserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Condition: NoCustomAuthDomain
+    Properties:
+      Domain: !Sub "${AppName}-${Stage}"
+      UserPoolId: !Ref UserPool
+
+  # Custom domain for Cognito (auth.quiznight.live)
+  UserPoolCustomDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Condition: HasCustomAuthDomain
+    Properties:
+      Domain: !Ref AuthDomainName
+      UserPoolId: !Ref UserPool
+      CustomDomainConfig:
+        CertificateArn: !Ref AuthDomainCertificateArn
+
+  # Route53 A record alias for the custom auth domain
+  AuthDomainDnsRecord:
+    Type: AWS::Route53::RecordSet
+    Condition: HasCustomAuthDomain
+    DependsOn: UserPoolCustomDomain
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Ref AuthDomainName
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt UserPoolCustomDomain.CloudFrontDistribution
+        HostedZoneId: Z2FDTNDATAQYW2  # CloudFront hosted zone ID (constant)
+        EvaluateTargetHealth: false
+
+  # Google Identity Provider
+  GoogleIdentityProvider:
+    Type: AWS::Cognito::UserPoolIdentityProvider
+    Condition: HasGoogleOAuth
+    Properties:
+      UserPoolId: !Ref UserPool
+      ProviderName: Google
+      ProviderType: Google
+      ProviderDetails:
+        client_id: !Ref GoogleClientId
+        client_secret: !Ref GoogleClientSecret
+        authorize_scopes: "email profile openid"
+      AttributeMapping:
+        email: email
+        name: name
+        given_name: given_name
+        family_name: family_name
+        picture: picture
+
+  # UserPoolClient - no Google, no custom domain
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Condition: NoGoogleNoCustomDomain
+    DependsOn:
+      - UserPoolDomain
+    Properties:
+      ClientName: !Sub "${AppName}-client-${Stage}"
+      UserPoolId: !Ref UserPool
+      GenerateSecret: false
+      ExplicitAuthFlows:
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      SupportedIdentityProviders:
+        - COGNITO
+      CallbackURLs:
+        - "http://localhost:3000"
+        - !Ref FrontendUrl
+      LogoutURLs:
+        - "http://localhost:3000"
+        - !Ref FrontendUrl
+      AllowedOAuthFlows:
+        - code
+      AllowedOAuthScopes:
+        - email
+        - openid
+        - profile
+        - aws.cognito.signin.user.admin
+      AllowedOAuthFlowsUserPoolClient: true
+
+  # UserPoolClient with custom domain (no Google)
+  UserPoolClientCustomDomain:
+    Type: AWS::Cognito::UserPoolClient
+    Condition: NoGoogleCustomDomain
+    DependsOn:
+      - UserPoolCustomDomain
+    Properties:
+      ClientName: !Sub "${AppName}-client-${Stage}"
+      UserPoolId: !Ref UserPool
+      GenerateSecret: false
+      ExplicitAuthFlows:
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      SupportedIdentityProviders:
+        - COGNITO
+      CallbackURLs:
+        - "http://localhost:3000"
+        - !Ref FrontendUrl
+      LogoutURLs:
+        - "http://localhost:3000"
+        - !Ref FrontendUrl
+      AllowedOAuthFlows:
+        - code
+      AllowedOAuthScopes:
+        - email
+        - openid
+        - profile
+        - aws.cognito.signin.user.admin
+      AllowedOAuthFlowsUserPoolClient: true
+
+  # UserPoolClient with Google support - no custom domain
+  UserPoolClientWithGoogle:
+    Type: AWS::Cognito::UserPoolClient
+    Condition: GoogleNoCustomDomain
+    DependsOn:
+      - GoogleIdentityProvider
+      - UserPoolDomain
+    Properties:
+      ClientName: !Sub "${AppName}-client-google-${Stage}"
+      UserPoolId: !Ref UserPool
+      GenerateSecret: false
+      ExplicitAuthFlows:
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      SupportedIdentityProviders:
+        - COGNITO
+        - Google
+      CallbackURLs:
+        - "http://localhost:3000"
+        - !Ref FrontendUrl
+      LogoutURLs:
+        - "http://localhost:3000"
+        - !Ref FrontendUrl
+      AllowedOAuthFlows:
+        - code
+      AllowedOAuthScopes:
+        - email
+        - openid
+        - profile
+        - aws.cognito.signin.user.admin
+      AllowedOAuthFlowsUserPoolClient: true
+
+  # UserPoolClient with Google + Custom domain
+  UserPoolClientGoogleCustomDomain:
+    Type: AWS::Cognito::UserPoolClient
+    Condition: GoogleCustomDomain
+    DependsOn:
+      - GoogleIdentityProvider
+      - UserPoolCustomDomain
+    Properties:
+      ClientName: !Sub "${AppName}-client-google-${Stage}"
+      UserPoolId: !Ref UserPool
+      GenerateSecret: false
+      ExplicitAuthFlows:
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      SupportedIdentityProviders:
+        - COGNITO
+        - Google
+      CallbackURLs:
+        - "http://localhost:3000"
+        - !Ref FrontendUrl
+      LogoutURLs:
+        - "http://localhost:3000"
+        - !Ref FrontendUrl
+      AllowedOAuthFlows:
+        - code
+      AllowedOAuthScopes:
+        - email
+        - openid
+        - profile
+        - aws.cognito.signin.user.admin
+      AllowedOAuthFlowsUserPoolClient: true
+
+  IdentityPool:
+    Type: AWS::Cognito::IdentityPool
+    Properties:
+      IdentityPoolName: !Sub "${AppName}_identity_pool_${Stage}"
+      AllowUnauthenticatedIdentities: true
+      CognitoIdentityProviders:
+        - ClientId: !If
+            - GoogleCustomDomain
+            - !Ref UserPoolClientGoogleCustomDomain
+            - !If
+              - GoogleNoCustomDomain
+              - !Ref UserPoolClientWithGoogle
+              - !If
+                - NoGoogleCustomDomain
+                - !Ref UserPoolClientCustomDomain
+                - !Ref UserPoolClient
+          ProviderName: !GetAtt UserPool.ProviderName
+
+  IdentityPoolRoleAttachment:
+    Type: AWS::Cognito::IdentityPoolRoleAttachment
+    Properties:
+      IdentityPoolId: !Ref IdentityPool
+      Roles:
+        authenticated: !GetAtt AuthenticatedRole.Arn
+        unauthenticated: !GetAtt UnauthenticatedRole.Arn
+
+  # Post-Confirmation Lambda - creates user profile in DynamoDB
+  CognitoPostConfirmationFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${AppName}-cognito-post-confirmation-${Stage}"
+      Runtime: nodejs20.x
+      Handler: index.handler
+      Role: !GetAtt CognitoPostConfirmationRole.Arn
+      Timeout: 30
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref DataTableName
+      Code:
+        S3Bucket: !Ref TemplateBucketName
+        S3Key: !Sub "functions/${Stage}/cognitoPostConfirmation.zip"
+      Tags:
+        - Key: Project
+          Value: live-pub-quiz
+
+  CognitoPostConfirmationRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${AppName}-cognito-post-confirm-role-${Stage}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: DynamoDBAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:Query
+                Resource:
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${DataTableName}"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${DataTableName}/index/*"
+      Tags:
+        - Key: Project
+          Value: live-pub-quiz
+
+  CognitoPostConfirmationPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref CognitoPostConfirmationFunction
+      Principal: cognito-idp.amazonaws.com
+      Action: lambda:InvokeFunction
+      SourceArn: !GetAtt UserPool.Arn
+
+  CognitoPostConfirmationLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${AppName}-cognito-post-confirmation-${Stage}"
+      RetentionInDays: !Ref LogRetentionInDays
+      Tags:
+        - Key: Project
+          Value: live-pub-quiz
+
+  # Pre Sign-Up Lambda - links external provider accounts to existing native accounts
+  CognitoPreSignUpFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${AppName}-cognito-pre-signup-${Stage}"
+      Runtime: nodejs20.x
+      Handler: index.handler
+      Role: !GetAtt CognitoPreSignUpRole.Arn
+      Timeout: 30
+      Environment:
+        Variables:
+          USER_POOL_ID: !Sub "${AppName}-userpool-${Stage}"
+      Code:
+        S3Bucket: !Ref TemplateBucketName
+        S3Key: !Sub "functions/${Stage}/cognitoPreSignUp.zip"
+      Tags:
+        - Key: Project
+          Value: live-pub-quiz
+
+  CognitoPreSignUpRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${AppName}-cognito-pre-signup-role-${Stage}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: CognitoAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cognito-idp:ListUsers
+                  - cognito-idp:AdminLinkProviderForUser
+                  - cognito-idp:AdminCreateUser
+                  - cognito-idp:AdminSetUserPassword
+                Resource:
+                  - !Sub "arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/*"
+      Tags:
+        - Key: Project
+          Value: live-pub-quiz
+
+  CognitoPreSignUpPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref CognitoPreSignUpFunction
+      Principal: cognito-idp.amazonaws.com
+      Action: lambda:InvokeFunction
+      SourceArn: !Sub "arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/*"
+
+  CognitoPreSignUpLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${AppName}-cognito-pre-signup-${Stage}"
+      RetentionInDays: !Ref LogRetentionInDays
+      Tags:
+        - Key: Project
+          Value: live-pub-quiz
+
+  # Authenticated role for Cognito Identity Pool
+  AuthenticatedRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${AppName}-authenticated-role-${Stage}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: cognito-identity.amazonaws.com
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                cognito-identity.amazonaws.com:aud: !Ref IdentityPool
+              ForAnyValue:StringLike:
+                cognito-identity.amazonaws.com:amr: authenticated
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSAppSyncInvokeFullAccess
+      Tags:
+        - Key: Project
+          Value: live-pub-quiz
+
+  # Unauthenticated role for Cognito Identity Pool (limited access)
+  UnauthenticatedRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${AppName}-unauthenticated-role-${Stage}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: cognito-identity.amazonaws.com
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                cognito-identity.amazonaws.com:aud: !Ref IdentityPool
+              ForAnyValue:StringLike:
+                cognito-identity.amazonaws.com:amr: unauthenticated
+      Policies:
+        - PolicyName: UnauthenticatedAppSyncPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - appsync:GraphQL
+                Resource:
+                  # Allow only specific queries for unauthenticated users
+                  - !Sub "arn:aws:appsync:${AWS::Region}:${AWS::AccountId}:apis/*/types/Query/fields/checkDisplayNameAvailable"
+      Tags:
+        - Key: Project
+          Value: live-pub-quiz
+
+Outputs:
+  UserPoolId:
+    Description: Cognito User Pool ID
+    Value: !Ref UserPool
+
+  UserPoolArn:
+    Description: Cognito User Pool ARN
+    Value: !GetAtt UserPool.Arn
+
+  UserPoolClientId:
+    Description: Cognito User Pool Client ID
+    Value: !If
+      - GoogleCustomDomain
+      - !Ref UserPoolClientGoogleCustomDomain
+      - !If
+        - GoogleNoCustomDomain
+        - !Ref UserPoolClientWithGoogle
+        - !If
+          - NoGoogleCustomDomain
+          - !Ref UserPoolClientCustomDomain
+          - !Ref UserPoolClient
+
+  UserPoolProviderName:
+    Description: Cognito User Pool Provider Name
+    Value: !GetAtt UserPool.ProviderName
+
+  IdentityPoolId:
+    Description: Cognito Identity Pool ID
+    Value: !Ref IdentityPool
+
+  UserPoolDomainPrefix:
+    Description: Cognito User Pool Domain Prefix
+    Value: !If [HasCustomAuthDomain, !Ref AuthDomainName, !Sub "${AppName}-${Stage}"]
+
+  UserPoolDomain:
+    Description: Cognito User Pool Domain URL
+    Value: !If
+      - HasCustomAuthDomain
+      - !Ref AuthDomainName
+      - !Sub "${AppName}-${Stage}.auth.${AWS::Region}.amazoncognito.com"
+
+  GoogleOAuthEnabled:
+    Description: Whether Google OAuth is enabled
+    Value: !If [HasGoogleOAuth, "true", "false"]

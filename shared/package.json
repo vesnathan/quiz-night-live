@@ -1,0 +1,18 @@
+{
+  "name": "@quiz/shared",
+  "version": "1.0.0",
+  "description": "Shared types, constants, and utilities for Live Pub Quiz",
+  "main": "src/index.ts",
+  "license": "MIT",
+  "exports": {
+    ".": "./src/index.ts",
+    "./constants/*": "./src/constants/*.ts",
+    "./types/*": "./src/types/*.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4"
+  }
+}
