@@ -12,6 +12,7 @@ import {
   MAX_PLAYERS_PER_ROOM,
   POINTS_CORRECT,
   POINTS_WRONG,
+  JOIN_WINDOW_SECONDS,
 } from '@quiz/shared';
 import type {
   Question,
@@ -433,6 +434,35 @@ let questionCachePrewarmed = false;
 // Track players in lobby (waiting to join a room)
 const lobbyPlayers: Map<string, { displayName: string; joinedAt: number }> = new Map();
 
+/**
+ * Check if current time is within the join window (1 minute before set start, or during active set)
+ * Sets start at :00 and :30
+ */
+function isJoinWindowOpen(): { canJoin: boolean; reason?: string; secondsUntilOpen?: number } {
+  const now = new Date();
+  const minutes = now.getMinutes();
+  const seconds = now.getSeconds();
+  const secondsInHalfHour = (minutes % 30) * 60 + seconds;
+
+  // If a set is currently in progress (first SET_DURATION_MINUTES of half hour), allow joining
+  const minutesInHalfHour = minutes % 30;
+  if (minutesInHalfHour < SET_DURATION_MINUTES) {
+    return { canJoin: true };
+  }
+
+  // Check if we're in the join window (last JOIN_WINDOW_SECONDS before next half hour)
+  const secondsUntilNextHalfHour = 30 * 60 - secondsInHalfHour;
+  if (secondsUntilNextHalfHour <= JOIN_WINDOW_SECONDS) {
+    return { canJoin: true };
+  }
+
+  return {
+    canJoin: false,
+    reason: 'Joining is only available 1 minute before the next set starts',
+    secondsUntilOpen: secondsUntilNextHalfHour - JOIN_WINDOW_SECONDS,
+  };
+}
+
 // ============ Ably Initialization ============
 
 function initAbly(): void {
@@ -508,6 +538,18 @@ function setupLobbyPresence(): void {
   lobbyChannel.subscribe('join_room', async (message) => {
     const { playerId, roomId, displayName } = message.data;
 
+    // Check if join window is open
+    const joinWindow = isJoinWindowOpen();
+    if (!joinWindow.canJoin) {
+      await lobbyChannel!.publish('join_room_result', {
+        playerId,
+        success: false,
+        error: joinWindow.reason,
+        secondsUntilOpen: joinWindow.secondsUntilOpen,
+      });
+      return;
+    }
+
     const room = getRoom(roomId);
     if (!room) {
       await lobbyChannel!.publish('join_room_result', {
@@ -536,6 +578,18 @@ function setupLobbyPresence(): void {
   // Handle auto-join (find any available room)
   lobbyChannel.subscribe('auto_join', async (message) => {
     const { playerId, displayName } = message.data;
+
+    // Check if join window is open
+    const joinWindow = isJoinWindowOpen();
+    if (!joinWindow.canJoin) {
+      await lobbyChannel!.publish('join_room_result', {
+        playerId,
+        success: false,
+        error: joinWindow.reason,
+        secondsUntilOpen: joinWindow.secondsUntilOpen,
+      });
+      return;
+    }
 
     let room = findAvailableRoom();
 
@@ -635,7 +689,13 @@ async function broadcastRoomList(): Promise<void> {
   if (!lobbyChannel) return;
 
   const rooms = getRoomList();
-  await lobbyChannel.publish('room_list', { rooms });
+  const joinWindow = isJoinWindowOpen();
+
+  await lobbyChannel.publish('room_list', {
+    rooms,
+    joinWindowOpen: joinWindow.canJoin,
+    secondsUntilJoinOpen: joinWindow.secondsUntilOpen,
+  });
 }
 
 // ============ Room Game Logic ============
@@ -1181,6 +1241,11 @@ async function runGameLoop(): Promise<void> {
       const newRoom = createRoom('medium');
       setupRoomChannel(newRoom.id);
       console.log(`🏠 Created new room (all full): ${newRoom.name}`);
+      await broadcastRoomList();
+    }
+
+    // Broadcast room list every 5 seconds to update join window countdown
+    if (now.getSeconds() % 5 === 0) {
       await broadcastRoomList();
     }
 

@@ -18,6 +18,7 @@ export const MAX_LATENCY_COMPENSATION_MS = 300;
 export const MAX_PLAYERS_PER_ROOM = 20;
 export const INITIAL_ROOMS_COUNT = 3; // Number of rooms to create each half-hour
 export const ROOM_RESERVE_TIMEOUT_MS = 30 * 60 * 1000; // Reserve spot for disconnected player until set ends
+export const JOIN_WINDOW_SECONDS = 60; // Players can join 1 minute before set starts
 
 // Room difficulty point modifiers
 export const ROOM_DIFFICULTY_POINTS = {

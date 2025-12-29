@@ -7,16 +7,45 @@ import { useAuth } from '@/contexts/AuthContext';
 interface UseLobbyChannelReturn {
   rooms: RoomListItem[];
   isConnected: boolean;
-  joinRoom: (roomId: string) => Promise<{ success: boolean; roomId?: string; roomName?: string; error?: string }>;
-  autoJoin: () => Promise<{ success: boolean; roomId?: string; roomName?: string; error?: string }>;
+  joinWindowOpen: boolean;
+  secondsUntilJoinOpen: number | null;
+  joinRoom: (roomId: string) => Promise<{ success: boolean; roomId?: string; roomName?: string; error?: string; secondsUntilOpen?: number }>;
+  autoJoin: () => Promise<{ success: boolean; roomId?: string; roomName?: string; error?: string; secondsUntilOpen?: number }>;
 }
 
 export function useLobbyChannel(): UseLobbyChannelReturn {
   const [rooms, setRooms] = useState<RoomListItem[]>([]);
   const [isConnected, setIsConnected] = useState(false);
+  const [joinWindowOpen, setJoinWindowOpen] = useState(false);
+  const [serverSecondsUntilJoinOpen, setServerSecondsUntilJoinOpen] = useState<number | null>(null);
+  const [lastServerUpdate, setLastServerUpdate] = useState<number>(Date.now());
+  const [interpolatedSeconds, setInterpolatedSeconds] = useState<number | null>(null);
   const [ably, setAbly] = useState<Ably.Realtime | null>(null);
   const [channel, setChannel] = useState<Ably.RealtimeChannel | null>(null);
   const { user } = useAuth();
+
+  // Interpolate seconds between server updates for smooth countdown
+  useEffect(() => {
+    if (serverSecondsUntilJoinOpen === null || joinWindowOpen) {
+      setInterpolatedSeconds(null);
+      return;
+    }
+
+    const updateInterpolated = () => {
+      const elapsed = Math.floor((Date.now() - lastServerUpdate) / 1000);
+      const remaining = Math.max(0, serverSecondsUntilJoinOpen - elapsed);
+      setInterpolatedSeconds(remaining);
+
+      // If countdown reaches 0, assume window opened
+      if (remaining === 0) {
+        setJoinWindowOpen(true);
+      }
+    };
+
+    updateInterpolated();
+    const interval = setInterval(updateInterpolated, 1000);
+    return () => clearInterval(interval);
+  }, [serverSecondsUntilJoinOpen, lastServerUpdate, joinWindowOpen]);
 
   useEffect(() => {
     const ablyKey = process.env.NEXT_PUBLIC_ABLY_KEY;
@@ -45,8 +74,11 @@ export function useLobbyChannel(): UseLobbyChannelReturn {
 
     // Subscribe to room list updates
     lobbyChannel.subscribe('room_list', (message) => {
-      const { rooms: roomList } = message.data;
+      const { rooms: roomList, joinWindowOpen: windowOpen, secondsUntilJoinOpen: secondsUntil } = message.data;
       setRooms(roomList || []);
+      setJoinWindowOpen(windowOpen ?? false);
+      setServerSecondsUntilJoinOpen(secondsUntil ?? null);
+      setLastServerUpdate(Date.now());
     });
 
     return () => {
@@ -56,7 +88,7 @@ export function useLobbyChannel(): UseLobbyChannelReturn {
     };
   }, [user?.userId, user?.name, user?.email]);
 
-  const joinRoom = useCallback(async (roomId: string): Promise<{ success: boolean; roomId?: string; roomName?: string; error?: string }> => {
+  const joinRoom = useCallback(async (roomId: string): Promise<{ success: boolean; roomId?: string; roomName?: string; error?: string; secondsUntilOpen?: number }> => {
     if (!channel || !user) {
       return { success: false, error: 'Not connected to lobby' };
     }
@@ -71,6 +103,7 @@ export function useLobbyChannel(): UseLobbyChannelReturn {
             roomId: data.roomId,
             roomName: data.roomName,
             error: data.error,
+            secondsUntilOpen: data.secondsUntilOpen,
           });
         }
       };
@@ -90,7 +123,7 @@ export function useLobbyChannel(): UseLobbyChannelReturn {
     });
   }, [channel, user]);
 
-  const autoJoin = useCallback(async (): Promise<{ success: boolean; roomId?: string; roomName?: string; error?: string }> => {
+  const autoJoin = useCallback(async (): Promise<{ success: boolean; roomId?: string; roomName?: string; error?: string; secondsUntilOpen?: number }> => {
     if (!channel || !user) {
       return { success: false, error: 'Not connected to lobby' };
     }
@@ -105,6 +138,7 @@ export function useLobbyChannel(): UseLobbyChannelReturn {
             roomId: data.roomId,
             roomName: data.roomName,
             error: data.error,
+            secondsUntilOpen: data.secondsUntilOpen,
           });
         }
       };
@@ -126,6 +160,8 @@ export function useLobbyChannel(): UseLobbyChannelReturn {
   return {
     rooms,
     isConnected,
+    joinWindowOpen,
+    secondsUntilJoinOpen: interpolatedSeconds,
     joinRoom,
     autoJoin,
   };

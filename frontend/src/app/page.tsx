@@ -1,8 +1,7 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { Button, Card, CardBody, Chip, Spinner } from '@nextui-org/react';
-import { useRouter } from 'next/navigation';
 import { signInWithRedirect } from 'aws-amplify/auth';
 import { useGameStore } from '@/stores/gameStore';
 import { useAuth } from '@/contexts/AuthContext';
@@ -16,14 +15,9 @@ import { useLobbyPresence } from '@/hooks/useLobbyPresence';
 import { AuthModal } from '@/components/auth/AuthModal';
 import { GOOGLE_OAUTH_ENABLED } from '@/lib/amplify';
 
-// How many milliseconds before set start users can join
-const JOIN_WINDOW_MS = 60 * 1000; // 1 minute
-
 export default function Home() {
-  const router = useRouter();
   const { user, isAuthenticated, isLoading, signOut } = useAuth();
-  const { isSetActive, nextSetTime, setPlayer } = useGameStore();
-  const [canJoin, setCanJoin] = useState(false);
+  const { isSetActive, nextSetTime } = useGameStore();
   // Connect to Ably for all users (to receive game status updates)
   // Only authenticated users will enter presence
   const { activeUserCount, isConnected } = useLobbyPresence({
@@ -33,20 +27,6 @@ export default function Home() {
   });
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
-
-  // Check if user can join the game (within 1 minute of set start OR set is active)
-  useEffect(() => {
-    const checkCanJoin = () => {
-      const now = Date.now();
-      const timeUntilSet = nextSetTime - now;
-      // Can join if set is active OR within 1 minute of start
-      setCanJoin(isSetActive || timeUntilSet <= JOIN_WINDOW_MS);
-    };
-
-    checkCanJoin();
-    const interval = setInterval(checkCanJoin, 1000);
-    return () => clearInterval(interval);
-  }, [nextSetTime, isSetActive]);
 
   // Check if returning from OAuth redirect - skip splash if so
   const isOAuthCallback = typeof window !== 'undefined' &&
@@ -283,7 +263,7 @@ export default function Home() {
 
             {/* Right side: Room List */}
             <div>
-              <RoomList canJoin={canJoin} nextSetTime={nextSetTime} />
+              <RoomList />
             </div>
           </div>
         </div>

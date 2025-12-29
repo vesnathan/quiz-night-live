@@ -10,38 +10,19 @@ import { MAX_PLAYERS_PER_ROOM } from '@quiz/shared';
 import type { RoomListItem } from '@quiz/shared';
 
 interface RoomListProps {
-  canJoin?: boolean;
-  nextSetTime?: number;
   onJoinRoom?: (roomId: string) => void;
 }
 
-// Calculate time until join window opens (1 minute before set)
-const JOIN_WINDOW_MS = 60 * 1000;
-
-export function RoomList({ canJoin = true, nextSetTime, onJoinRoom }: RoomListProps) {
+export function RoomList({ onJoinRoom }: RoomListProps) {
   const router = useRouter();
   const { user } = useAuth();
   const { setPlayer, setCurrentRoomId } = useGameStore();
-  const { rooms, isConnected, joinRoom, autoJoin } = useLobbyChannel();
+  const { rooms, isConnected, joinWindowOpen, secondsUntilJoinOpen, joinRoom } = useLobbyChannel();
   const [joining, setJoining] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [timeUntilJoin, setTimeUntilJoin] = useState<number>(0);
 
-  // Update countdown timer
-  useEffect(() => {
-    if (!nextSetTime) return;
-
-    const updateTimer = () => {
-      const now = Date.now();
-      const joinOpenTime = nextSetTime - JOIN_WINDOW_MS;
-      const remaining = Math.max(0, joinOpenTime - now);
-      setTimeUntilJoin(remaining);
-    };
-
-    updateTimer();
-    const interval = setInterval(updateTimer, 1000);
-    return () => clearInterval(interval);
-  }, [nextSetTime]);
+  // Use server-provided join window status
+  const canJoin = joinWindowOpen;
 
   const handleJoinRoom = async (roomId: string) => {
     if (!user || !canJoin) return;
@@ -75,62 +56,16 @@ export function RoomList({ canJoin = true, nextSetTime, onJoinRoom }: RoomListPr
     }
   };
 
-  const handleAutoJoin = async () => {
-    if (!user || !canJoin) return;
-
-    setJoining('auto');
-    setError(null);
-
-    const result = await autoJoin();
-
-    if (result.success && result.roomId) {
-      setPlayer({
-        id: user.userId,
-        displayName: user.name || user.email.split('@')[0],
-        isAI: false,
-        latency: 0,
-        score: 0,
-        correctCount: 0,
-        wrongCount: 0,
-        joinedAt: Date.now(),
-      });
-      setCurrentRoomId(result.roomId, result.roomName);
-
-      if (onJoinRoom) {
-        onJoinRoom(result.roomId);
-      } else {
-        router.push(`/game?roomId=${result.roomId}`);
-      }
-    } else {
-      setError(result.error || 'Failed to join room');
-      setJoining(null);
-    }
-  };
-
-  const getRoomStatusColor = (room: RoomListItem): 'success' | 'warning' | 'danger' | 'default' => {
-    if (room.status === 'in_progress') return 'warning';
-    if (room.currentPlayers >= room.maxPlayers) return 'danger';
-    if (room.currentPlayers > room.maxPlayers * 0.7) return 'warning';
-    return 'success';
-  };
-
-  const getRoomStatusText = (room: RoomListItem): string => {
-    if (room.status === 'in_progress') return 'In Progress';
-    if (room.currentPlayers >= room.maxPlayers) return 'Full';
-    return 'Waiting';
-  };
-
   // Format time as mm:ss
-  const formatTime = (ms: number): string => {
-    const totalSeconds = Math.ceil(ms / 1000);
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  const formatTime = (seconds: number): string => {
+    const minutes = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${minutes}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Calculate progress percentage (for 30 min countdown to join window)
-  const maxWaitTime = 30 * 60 * 1000 - JOIN_WINDOW_MS; // 29 minutes max wait
-  const progressValue = canJoin ? 100 : Math.max(0, 100 - (timeUntilJoin / maxWaitTime) * 100);
+  // Calculate progress percentage (for 29 min countdown to join window)
+  const maxWaitSeconds = 29 * 60; // 29 minutes max wait
+  const progressValue = canJoin ? 100 : Math.max(0, 100 - ((secondsUntilJoinOpen || 0) / maxWaitSeconds) * 100);
 
   return (
     <Card className="bg-gray-900/70 backdrop-blur-sm">
@@ -142,21 +77,8 @@ export function RoomList({ canJoin = true, nextSetTime, onJoinRoom }: RoomListPr
           </Chip>
         </div>
 
-        {/* Join Timer or Quick Join */}
-        {canJoin ? (
-          <>
-            <Button
-              color="primary"
-              size="md"
-              className="w-full font-semibold mb-4"
-              onPress={handleAutoJoin}
-              isLoading={joining === 'auto'}
-              isDisabled={joining !== null || !isConnected}
-            >
-              Quick Join
-            </Button>
-          </>
-        ) : (
+        {/* Join Window Timer */}
+        {!canJoin && secondsUntilJoinOpen !== null && (
           <div className="flex flex-col items-center mb-6">
             <CircularProgress
               size="lg"
@@ -171,10 +93,16 @@ export function RoomList({ canJoin = true, nextSetTime, onJoinRoom }: RoomListPr
             />
             <div className="text-center mt-2">
               <div className="text-2xl font-bold text-primary-400">
-                {formatTime(timeUntilJoin)}
+                {formatTime(secondsUntilJoinOpen)}
               </div>
               <div className="text-sm text-gray-400">until rooms open</div>
             </div>
+          </div>
+        )}
+
+        {canJoin && (
+          <div className="bg-success-100/20 text-success-500 px-3 py-2 rounded-lg mb-4 text-sm text-center">
+            Select a room to join the quiz!
           </div>
         )}
 
