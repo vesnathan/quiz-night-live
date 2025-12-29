@@ -123,7 +123,7 @@ export function RoomList({ onJoinRoom }: RoomListProps) {
             <div className="text-center py-8 text-gray-400">
               <p>No rooms available</p>
               <p className="text-sm mt-1">
-                {canJoin ? 'Click Quick Join to create one!' : 'Rooms will appear when join opens'}
+                {canJoin ? 'Rooms will appear shortly' : 'Rooms will appear when join opens'}
               </p>
             </div>
           ) : (
