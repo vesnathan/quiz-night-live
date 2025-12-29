@@ -65,9 +65,10 @@ export default function Home() {
     }
   };
 
-  // Show splash screen for minimum 3 seconds AND until auth check AND Ably connection complete
+  // Show splash screen for minimum 3 seconds AND until auth check completes
+  // Ably connection is optional - don't block on it
   if (showSplash) {
-    const splashReady = !isLoading && isConnected;
+    const splashReady = !isLoading;
     return <SplashScreen onComplete={handleSplashComplete} minDuration={3000} isConnected={splashReady} />;
   }
 

@@ -15,6 +15,8 @@ const LAYERS = {
     width: 70,
     scale: 1.2,
     zIndex: 0,
+    parallaxX: -5,  // Moves opposite direction (negative = inverse)
+    parallaxY: -2,
   },
 
 
@@ -156,6 +158,10 @@ export function Logo3D({ className = '', animate = true }: Logo3DProps) {
   const liveX = useTransform(mouseX, [-1, 1], [-LAYERS.live.parallaxX, LAYERS.live.parallaxX]);
   const liveY = useTransform(mouseY, [-1, 1], [-LAYERS.live.parallaxY, LAYERS.live.parallaxY]);
 
+  // Board moves in opposite direction (creates depth)
+  const boardX = useTransform(mouseX, [-1, 1], [-LAYERS.board.parallaxX, LAYERS.board.parallaxX]);
+  const boardY = useTransform(mouseY, [-1, 1], [-LAYERS.board.parallaxY, LAYERS.board.parallaxY]);
+
   // Helper to calculate left position from center offset
   // Formula: 50% (center) + offsetX - (width/2) to center the element
   const getLeftStyle = (layer: { offsetX: number; width: number }) =>
@@ -167,15 +173,17 @@ export function Logo3D({ className = '', animate = true }: Logo3DProps) {
       className={`relative ${className}`}
       style={{ width: '100%', maxWidth: '500px', aspectRatio: '809/500', margin: '0 auto' }}
     >
-      {/* Layer 0: Board (background - stays still) */}
-      <div
+      {/* Layer 0: Board (background - moves opposite direction for depth) */}
+      <motion.div
         className="absolute"
         style={{
           width: `${LAYERS.board.width}%`,
           top: `${LAYERS.board.top}%`,
           left: getLeftStyle(LAYERS.board),
           zIndex: LAYERS.board.zIndex,
-          transform: `scale(${LAYERS.board.scale})`,
+          x: boardX,
+          y: boardY,
+          scale: LAYERS.board.scale,
         }}
       >
         <img
@@ -186,7 +194,7 @@ export function Logo3D({ className = '', animate = true }: Logo3DProps) {
             filter: 'drop-shadow(0 10px 30px rgba(255, 100, 0, 0.4))',
           }}
         />
-      </div>
+      </motion.div>
 
       {/* Layer 1: Microphone (parallax layer) */}
       <motion.div
