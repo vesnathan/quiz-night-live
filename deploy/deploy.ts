@@ -243,8 +243,8 @@ async function stackExists(): Promise<boolean> {
   try {
     await cfnClient.send(new DescribeStacksCommand({ StackName: STACK_NAME }));
     return true;
-  } catch (error: any) {
-    if (error.message?.includes('does not exist')) {
+  } catch (error: unknown) {
+    if (error instanceof Error && error.message?.includes('does not exist')) {
       return false;
     }
     throw error;
@@ -326,8 +326,8 @@ async function deployStack(): Promise<void> {
       );
     }
     console.log('Stack deployment complete!');
-  } catch (error: any) {
-    if (error.message?.includes('No updates are to be performed')) {
+  } catch (error: unknown) {
+    if (error instanceof Error && error.message?.includes('No updates are to be performed')) {
       console.log('No infrastructure updates needed');
     } else {
       throw error;

@@ -643,11 +643,73 @@ class ResolverCompiler {
     );
 
     // Add global declarations for AppSync runtime
+    // Note: These use 'unknown' where possible, but some must remain loosely typed
+    // because AppSync runtime injects these globals with dynamic shapes
     const appsyncGlobals = `// AppSync runtime globals (provided by AppSync, declared for TypeScript)
-declare const util: any;
-declare const runtime: any;
-type Context<TArguments = any, TSource = any, TStash = any, TResult = any, TReturns = any> = any;
-type AppSyncIdentityCognito = any;
+declare const util: {
+  error: (message: string, errorType?: string, data?: unknown, errorInfo?: unknown) => never;
+  appendError: (message: string, errorType?: string, data?: unknown, errorInfo?: unknown) => void;
+  autoId: () => string;
+  time: {
+    nowISO8601: () => string;
+    nowEpochSeconds: () => number;
+    nowEpochMilliSeconds: () => number;
+    nowFormatted: (format: string, timezone?: string) => string;
+    parseFormattedToEpochMilliSeconds: (time: string, format: string, timezone?: string) => number;
+    parseISO8601ToEpochMilliSeconds: (time: string) => number;
+    epochMilliSecondsToSeconds: (epoch: number) => number;
+    epochMilliSecondsToISO8601: (epoch: number) => string;
+    epochMilliSecondsToFormatted: (epoch: number, format: string, timezone?: string) => string;
+  };
+  dynamodb: {
+    toDynamoDB: (value: unknown) => Record<string, unknown>;
+    toMapValues: (values: Record<string, unknown>) => Record<string, unknown>;
+    toS3Object: (key: string, bucket: string, region: string, version?: string) => unknown;
+  };
+  transform: {
+    toDynamoDBFilterExpression: (filter: unknown) => unknown;
+  };
+  str: {
+    toUpper: (str: string) => string;
+    toLower: (str: string) => string;
+    toReplace: (str: string, substr: string, newSubstr: string) => string;
+    normalize: (str: string, form: string) => string;
+  };
+  math: {
+    roundNum: (num: number) => number;
+    minVal: (nums: number[]) => number;
+    maxVal: (nums: number[]) => number;
+    randomDouble: () => number;
+    randomWithSeed: (seed: number) => number;
+  };
+  authType: () => string;
+};
+declare const runtime: {
+  earlyReturn: (result: unknown) => never;
+};
+interface ContextIdentity {
+  sub: string;
+  issuer: string;
+  username: string;
+  claims: Record<string, unknown>;
+  sourceIp: string[];
+  defaultAuthStrategy: string;
+  groups: string[] | null;
+}
+type Context<TArguments = Record<string, unknown>, TSource = Record<string, unknown> | null, TStash = Record<string, unknown>, TResult = unknown, TReturns = unknown> = {
+  arguments: TArguments;
+  args: TArguments;
+  source: TSource;
+  result: TResult;
+  prev: { result: TReturns } | null;
+  stash: TStash;
+  identity: ContextIdentity | null;
+  request: { headers: Record<string, string>; domainName: string | null };
+  info: { fieldName: string; parentTypeName: string; variables: Record<string, unknown>; selectionSetList: string[]; selectionSetGraphQL: string };
+  env: Record<string, string>;
+  error: { message: string; type: string } | null;
+};
+type AppSyncIdentityCognito = ContextIdentity;
 
 `;
     codeToCompile = appsyncGlobals + codeToCompile;
