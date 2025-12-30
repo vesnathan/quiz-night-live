@@ -11,6 +11,15 @@ const cognitoClient = new CognitoIdentityProviderClient({});
 
 const USER_POOL_ID = process.env.USER_POOL_ID!;
 
+interface CognitoIdentity {
+  providerName: string;
+  userId: string;
+  providerType?: string;
+  issuer?: string;
+  primary?: boolean;
+  dateCreated?: number;
+}
+
 /**
  * Pre Sign-Up Lambda Trigger
  *
@@ -79,8 +88,8 @@ export const handler: PreSignUpTriggerHandler = async (event: PreSignUpTriggerEv
         const identitiesAttr = nativeUser.Attributes?.find(a => a.Name === 'identities');
         if (identitiesAttr?.Value) {
           try {
-            const identities = JSON.parse(identitiesAttr.Value);
-            const alreadyLinked = identities.some((id: any) =>
+            const identities: CognitoIdentity[] = JSON.parse(identitiesAttr.Value);
+            const alreadyLinked = identities.some((id: CognitoIdentity) =>
               id.providerName === providerName && id.userId === providerUserId
             );
             if (alreadyLinked) {
@@ -132,8 +141,8 @@ export const handler: PreSignUpTriggerHandler = async (event: PreSignUpTriggerEv
     event.response.autoConfirmUser = true;
 
     return event;
-  } catch (error: any) {
-    if (error.message === 'LINKED_TO_EXISTING_USER') {
+  } catch (error: unknown) {
+    if (error instanceof Error && error.message === 'LINKED_TO_EXISTING_USER') {
       // Re-throw our custom error
       throw error;
     }

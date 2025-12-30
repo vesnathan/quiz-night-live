@@ -34,6 +34,24 @@ interface APIGatewayResponse {
   body: string;
 }
 
+// PayPal Event Types
+interface PayPalBillingInfo {
+  next_billing_time?: string;
+}
+
+interface PayPalSubscriptionResource {
+  id: string;
+  plan_id: string;
+  status: string;
+  custom_id?: string;
+  billing_info?: PayPalBillingInfo;
+}
+
+interface PayPalSubscriptionEvent {
+  event_type: string;
+  resource: PayPalSubscriptionResource;
+}
+
 // PayPal subscription status mapping
 const PAYPAL_STATUS_MAP: Record<string, SubscriptionStatus> = {
   ACTIVE: 'active',
@@ -216,7 +234,7 @@ async function updateUserSubscription(
   console.log(`Updated PayPal subscription for user ${userId}: tier=${tier}, status=${status}`);
 }
 
-async function handleSubscriptionCreated(event: any): Promise<void> {
+async function handleSubscriptionCreated(event: PayPalSubscriptionEvent): Promise<void> {
   const resource = event.resource;
   const subscriptionId = resource.id;
   const planId = resource.plan_id;
@@ -241,7 +259,7 @@ async function handleSubscriptionCreated(event: any): Promise<void> {
   console.log(`PayPal subscription created for user ${userId}, tier ${tier}`);
 }
 
-async function handleSubscriptionActivated(event: any): Promise<void> {
+async function handleSubscriptionActivated(event: PayPalSubscriptionEvent): Promise<void> {
   const resource = event.resource;
   const subscriptionId = resource.id;
   const planId = resource.plan_id;
@@ -271,7 +289,7 @@ async function handleSubscriptionActivated(event: any): Promise<void> {
   console.log(`PayPal subscription activated for user ${userId}`);
 }
 
-async function handleSubscriptionUpdated(event: any): Promise<void> {
+async function handleSubscriptionUpdated(event: PayPalSubscriptionEvent): Promise<void> {
   const resource = event.resource;
   const subscriptionId = resource.id;
   const planId = resource.plan_id;
@@ -295,7 +313,7 @@ async function handleSubscriptionUpdated(event: any): Promise<void> {
   console.log(`PayPal subscription updated for user ${userId}: tier=${tier}, status=${status}`);
 }
 
-async function handleSubscriptionCancelled(event: any): Promise<void> {
+async function handleSubscriptionCancelled(event: PayPalSubscriptionEvent): Promise<void> {
   const resource = event.resource;
   const subscriptionId = resource.id;
 
@@ -331,7 +349,7 @@ async function handleSubscriptionCancelled(event: any): Promise<void> {
   console.log(`PayPal subscription cancelled for user ${userId}`);
 }
 
-async function handleSubscriptionSuspended(event: any): Promise<void> {
+async function handleSubscriptionSuspended(event: PayPalSubscriptionEvent): Promise<void> {
   const resource = event.resource;
   const subscriptionId = resource.id;
 

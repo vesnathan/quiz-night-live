@@ -34,6 +34,66 @@ interface APIGatewayResponse {
   body: string;
 }
 
+// Stripe Event Types
+interface StripeEventBase {
+  id: string;
+  type: string;
+  data: {
+    object: Record<string, unknown>;
+  };
+}
+
+interface StripeCheckoutSession {
+  id: string;
+  customer: string;
+  subscription: string;
+  metadata?: {
+    userId?: string;
+    tier?: string;
+  };
+}
+
+interface StripeSubscription {
+  id: string;
+  customer: string;
+  status: string;
+  current_period_end?: number;
+  items?: {
+    data?: Array<{
+      price?: {
+        id: string;
+      };
+    }>;
+  };
+}
+
+interface StripeInvoice {
+  id: string;
+  customer: string;
+  subscription?: string;
+}
+
+interface StripeCheckoutEvent extends StripeEventBase {
+  type: 'checkout.session.completed';
+  data: {
+    object: StripeCheckoutSession;
+  };
+}
+
+interface StripeSubscriptionEvent extends StripeEventBase {
+  type: 'customer.subscription.created' | 'customer.subscription.updated' | 'customer.subscription.deleted';
+  data: {
+    object: StripeSubscription;
+  };
+}
+
+interface StripeInvoiceEvent extends StripeEventBase {
+  type: 'invoice.payment_failed';
+  data: {
+    object: StripeInvoice;
+  };
+}
+
 // Stripe subscription status mapping
 const STRIPE_STATUS_MAP: Record<string, SubscriptionStatus> = {
   active: 'active',
@@ -199,7 +259,7 @@ async function updateUserSubscription(
   console.log(`Updated subscription for user ${userId}: tier=${tier}, status=${status}`);
 }
 
-async function handleCheckoutCompleted(event: any): Promise<void> {
+async function handleCheckoutCompleted(event: StripeCheckoutEvent): Promise<void> {
   const session = event.data.object;
 
   // Get the user ID from metadata (set during checkout creation)
@@ -229,7 +289,7 @@ async function handleCheckoutCompleted(event: any): Promise<void> {
   console.log(`Checkout completed for user ${userId}, tier ${tier}`);
 }
 
-async function handleSubscriptionCreated(event: any): Promise<void> {
+async function handleSubscriptionCreated(event: StripeSubscriptionEvent): Promise<void> {
   const subscription = event.data.object;
   const customerId = subscription.customer;
   const subscriptionId = subscription.id;
@@ -256,7 +316,7 @@ async function handleSubscriptionCreated(event: any): Promise<void> {
   );
 }
 
-async function handleSubscriptionUpdated(event: any): Promise<void> {
+async function handleSubscriptionUpdated(event: StripeSubscriptionEvent): Promise<void> {
   const subscription = event.data.object;
   const customerId = subscription.customer;
   const subscriptionId = subscription.id;
@@ -284,7 +344,7 @@ async function handleSubscriptionUpdated(event: any): Promise<void> {
   console.log(`Subscription updated for user ${userId}: tier=${tier}, status=${status}`);
 }
 
-async function handleSubscriptionDeleted(event: any): Promise<void> {
+async function handleSubscriptionDeleted(event: StripeSubscriptionEvent): Promise<void> {
   const subscription = event.data.object;
   const customerId = subscription.customer;
   const subscriptionId = subscription.id;
@@ -322,7 +382,7 @@ async function handleSubscriptionDeleted(event: any): Promise<void> {
   console.log(`Subscription cancelled for user ${userId}`);
 }
 
-async function handlePaymentFailed(event: any): Promise<void> {
+async function handlePaymentFailed(event: StripeInvoiceEvent): Promise<void> {
   const invoice = event.data.object;
   const customerId = invoice.customer;
   const subscriptionId = invoice.subscription;
