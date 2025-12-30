@@ -65,7 +65,7 @@ export function GameStatus() {
 
     return () => {
       clearInterval(interval);
-      document.title = 'Live Pub Quiz';
+      document.title = 'Quiz Night Live';
     };
   }, [nextSetTime, isSetActive, checkNotifications]);
 

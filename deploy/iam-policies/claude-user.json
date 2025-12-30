@@ -14,9 +14,9 @@
         "cloudformation:GetTemplate"
       ],
       "Resource": [
-        "arn:aws:cloudformation:*:430118819356:stack/wpq-*/*",
-        "arn:aws:cloudformation:*:430118819356:stack/web-pub-quiz-*/*",
-        "arn:aws:cloudformation:*:430118819356:stack/live-pub-quiz-*/*"
+        "arn:aws:cloudformation:*:430118819356:stack/qnl-*/*",
+        "arn:aws:cloudformation:*:430118819356:stack/quiz-night-live-*/*",
+        "arn:aws:cloudformation:*:430118819356:stack/quiz-night-live-*/*"
       ]
     },
     {
@@ -36,8 +36,8 @@
         "s3:GetBucketLocation"
       ],
       "Resource": [
-        "arn:aws:s3:::wpq-*",
-        "arn:aws:s3:::wpq-*/*"
+        "arn:aws:s3:::qnl-*",
+        "arn:aws:s3:::qnl-*/*"
       ]
     },
     {
@@ -54,7 +54,7 @@
       "Sid": "PassCFNRole",
       "Effect": "Allow",
       "Action": "iam:PassRole",
-      "Resource": "arn:aws:iam::430118819356:role/wpq-cfn-role",
+      "Resource": "arn:aws:iam::430118819356:role/qnl-cfn-role",
       "Condition": {
         "StringEquals": {
           "iam:PassedToService": "cloudformation.amazonaws.com"
@@ -65,7 +65,7 @@
       "Sid": "IAMReadRole",
       "Effect": "Allow",
       "Action": "iam:GetRole",
-      "Resource": "arn:aws:iam::430118819356:role/wpq-cfn-role"
+      "Resource": "arn:aws:iam::430118819356:role/qnl-cfn-role"
     },
     {
       "Sid": "CloudWatchLogs",
@@ -74,7 +74,7 @@
         "logs:DeleteLogGroup",
         "logs:DescribeLogGroups"
       ],
-      "Resource": "arn:aws:logs:*:430118819356:log-group:/aws/lambda/wpq-*"
+      "Resource": "arn:aws:logs:*:430118819356:log-group:/aws/lambda/qnl-*"
     }
   ]
 }

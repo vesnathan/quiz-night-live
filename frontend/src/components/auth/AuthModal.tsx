@@ -115,7 +115,7 @@ export function AuthModal({
           {(closeModal) => (
             <>
               <ModalHeader className="flex flex-col items-center gap-4 text-white pt-6">
-                <h2 className="text-2xl font-bold">Live Pub Quiz</h2>
+                <h2 className="text-2xl font-bold">Quiz Night Live</h2>
                 {authStep !== 'confirm' && (
                   <Tabs
                     selectedKey={selectedTab}

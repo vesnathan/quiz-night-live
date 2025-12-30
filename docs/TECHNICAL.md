@@ -1,8 +1,8 @@
-# Live Pub Quiz - Technical Documentation
+# Quiz Night Live - Technical Documentation
 
 ## Overview
 
-Live Pub Quiz is a real-time multiplayer trivia game with buzzer mechanics. Players compete to answer questions fastest, with latency compensation ensuring fair play across different network conditions.
+Quiz Night Live is a real-time multiplayer trivia game with buzzer mechanics. Players compete to answer questions fastest, with latency compensation ensuring fair play across different network conditions.
 
 ## Architecture
 

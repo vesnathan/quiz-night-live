@@ -145,7 +145,7 @@ const ddbClient = new DynamoDBClient({ region: process.env.AWS_REGION || 'ap-sou
 const docClient = DynamoDBDocumentClient.from(ddbClient, {
   marshallOptions: { removeUndefinedValues: true },
 });
-const TABLE_NAME = process.env.TABLE_NAME || 'wpq-datatable-prod';
+const TABLE_NAME = process.env.TABLE_NAME || 'qnl-datatable-prod';
 
 // Timing constants
 const RESULTS_DISPLAY_MS = 12000;

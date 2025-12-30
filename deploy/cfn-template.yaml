@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: "Live Pub Quiz Infrastructure"
+Description: "Quiz Night Live Infrastructure"
 
 Parameters:
   Stage:
@@ -9,7 +9,7 @@ Parameters:
   AppName:
     Type: String
     Description: Application short name (used in resource names)
-    Default: wpq
+    Default: qnl
   TemplateBucketName:
     Type: String
     Description: Name of the S3 bucket containing nested stack templates
@@ -238,7 +238,7 @@ Resources:
         - Key: App
           Value: !Ref AppName
         - Key: Project
-          Value: live-pub-quiz
+          Value: quiz-night-live
         - Key: Stage
           Value: !Ref Stage
 

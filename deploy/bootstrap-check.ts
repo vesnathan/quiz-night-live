@@ -9,8 +9,8 @@
  *
  * Security Principle: Least Privilege
  *
- * The deployment user (wpq-deploy) has MINIMAL permissions:
- *   - Create/update CloudFormation stacks (scoped to wpq-* stacks only)
+ * The deployment user (qnl-deploy) has MINIMAL permissions:
+ *   - Create/update CloudFormation stacks (scoped to qnl-* stacks only)
  *   - Upload templates to ONE specific S3 bucket
  *   - Pass the CloudFormation service role
  *
@@ -25,11 +25,11 @@
  * BOOTSTRAP RESOURCES:
  * ===================
  *
- * 1. S3 Bucket: wpq-deploy-templates (in ap-southeast-2)
+ * 1. S3 Bucket: qnl-deploy-templates (in ap-southeast-2)
  *    - Stores CloudFormation templates
  *    - Only the deploy user and CloudFormation need access
  *
- * 2. IAM Role: wpq-cloudformation-role
+ * 2. IAM Role: qnl-cloudformation-role
  *    - CloudFormation assumes this role to create resources
  *    - Has permissions to create all required AWS resources
  */
@@ -53,13 +53,13 @@ export interface BootstrapConfig {
 }
 
 const MAIN_REGION = "ap-southeast-2";
-// Use existing bucket name from wpq bootstrap
-const TEMPLATE_BUCKET_NAME = "wpq-deploy-templates";
+// Use existing bucket name from qnl bootstrap
+const TEMPLATE_BUCKET_NAME = "qnl-deploy-templates";
 
 export function getBootstrapConfig(): BootstrapConfig {
   // Use CFN_ROLE_ARN from .env if available
-  const cfnRoleArn = process.env.CFN_ROLE_ARN || `arn:aws:iam::${ACCOUNT_ID}:role/wpq-cfn-role`;
-  const cfnRoleName = cfnRoleArn.split('/').pop() || 'wpq-cfn-role';
+  const cfnRoleArn = process.env.CFN_ROLE_ARN || `arn:aws:iam::${ACCOUNT_ID}:role/qnl-cfn-role`;
+  const cfnRoleName = cfnRoleArn.split('/').pop() || 'qnl-cfn-role';
 
   return {
     templateBucketName: TEMPLATE_BUCKET_NAME,

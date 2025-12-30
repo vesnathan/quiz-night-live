@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: "Live Pub Quiz - AppSync GraphQL API"
+Description: "Quiz Night Live - AppSync GraphQL API"
 
 Parameters:
   Stage:
@@ -54,7 +54,7 @@ Resources:
         FieldLogLevel: ERROR
       Tags:
         - Key: Project
-          Value: live-pub-quiz
+          Value: quiz-night-live
         - Key: Stage
           Value: !Ref Stage
 

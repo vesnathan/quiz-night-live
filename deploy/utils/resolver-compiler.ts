@@ -653,7 +653,7 @@ type AppSyncIdentityCognito = any;
     codeToCompile = appsyncGlobals + codeToCompile;
 
     // Inject table name
-    const tableName = `wpq-datatable-${this.stage}`;
+    const tableName = `qnl-datatable-${this.stage}`;
 
     if (codeToCompile.includes("ctx.env.TABLE_NAME")) {
       codeToCompile = codeToCompile.replace(/ctx\.env\.TABLE_NAME/g, `"${tableName}"`);

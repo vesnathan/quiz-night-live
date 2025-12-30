@@ -19,7 +19,7 @@ import { ChangePasswordModal } from './auth/ChangePasswordModal';
 import { ChatDrawer } from './chat';
 import { useNotifications, useCountdownNotifications } from '@/hooks/useNotifications';
 
-const ADMIN_EMAIL = 'vesnathan+wpq-admin@gmail.com';
+const ADMIN_EMAIL = 'vesnathan+qnl-admin@gmail.com';
 
 interface GameBottomBarProps {
   playerScore: number;
@@ -88,7 +88,7 @@ export function GameBottomBar({ playerScore }: GameBottomBarProps) {
 
     return () => {
       clearInterval(interval);
-      document.title = 'Live Pub Quiz';
+      document.title = 'Quiz Night Live';
     };
   }, [nextSetTime, isSetActive, checkNotifications, updateSetTiming]);
 

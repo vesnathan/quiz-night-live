@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: "Live Pub Quiz - Lambda Functions"
+Description: "Quiz Night Live - Lambda Functions"
 
 Parameters:
   Stage:
@@ -49,7 +49,7 @@ Resources:
         S3Key: !Sub "functions/${Stage}/getAblyToken.zip"
       Tags:
         - Key: Project
-          Value: live-pub-quiz
+          Value: quiz-night-live
 
   GetAblyTokenRole:
     Type: AWS::IAM::Role
@@ -80,7 +80,7 @@ Resources:
                   - !Sub "${DataTableArn}/index/*"
       Tags:
         - Key: Project
-          Value: live-pub-quiz
+          Value: quiz-night-live
 
   GetAblyTokenLogGroup:
     Type: AWS::Logs::LogGroup
@@ -89,7 +89,7 @@ Resources:
       RetentionInDays: !Ref LogRetentionInDays
       Tags:
         - Key: Project
-          Value: live-pub-quiz
+          Value: quiz-night-live
 
   # Ensure Profile Lambda - creates profiles for OAuth users on first login
   EnsureProfileFunction:
@@ -108,7 +108,7 @@ Resources:
         S3Key: !Sub "functions/${Stage}/ensureProfile.zip"
       Tags:
         - Key: Project
-          Value: live-pub-quiz
+          Value: quiz-night-live
 
   EnsureProfileRole:
     Type: AWS::IAM::Role
@@ -138,7 +138,7 @@ Resources:
                   - !Sub "${DataTableArn}/index/*"
       Tags:
         - Key: Project
-          Value: live-pub-quiz
+          Value: quiz-night-live
 
   EnsureProfileLogGroup:
     Type: AWS::Logs::LogGroup
@@ -147,7 +147,7 @@ Resources:
       RetentionInDays: !Ref LogRetentionInDays
       Tags:
         - Key: Project
-          Value: live-pub-quiz
+          Value: quiz-night-live
 
   # Note: Orchestrator is now running on Fargate, not Lambda
   # See deploy/resources/Fargate/fargate.yaml
@@ -174,7 +174,7 @@ Resources:
         S3Key: !Sub "functions/${Stage}/stripeWebhook.zip"
       Tags:
         - Key: Project
-          Value: live-pub-quiz
+          Value: quiz-night-live
 
   StripeWebhookLogGroup:
     Type: AWS::Logs::LogGroup
@@ -183,7 +183,7 @@ Resources:
       RetentionInDays: !Ref LogRetentionInDays
       Tags:
         - Key: Project
-          Value: live-pub-quiz
+          Value: quiz-night-live
 
   # PayPal Webhook Lambda
   PayPalWebhookFunction:
@@ -207,7 +207,7 @@ Resources:
         S3Key: !Sub "functions/${Stage}/paypalWebhook.zip"
       Tags:
         - Key: Project
-          Value: live-pub-quiz
+          Value: quiz-night-live
 
   PayPalWebhookLogGroup:
     Type: AWS::Logs::LogGroup
@@ -216,7 +216,7 @@ Resources:
       RetentionInDays: !Ref LogRetentionInDays
       Tags:
         - Key: Project
-          Value: live-pub-quiz
+          Value: quiz-night-live
 
   # Checkout Session Lambda (creates Stripe/PayPal checkout sessions)
   CreateCheckoutFunction:
@@ -241,7 +241,7 @@ Resources:
         S3Key: !Sub "functions/${Stage}/createCheckout.zip"
       Tags:
         - Key: Project
-          Value: live-pub-quiz
+          Value: quiz-night-live
 
   CreateCheckoutLogGroup:
     Type: AWS::Logs::LogGroup
@@ -250,7 +250,7 @@ Resources:
       RetentionInDays: !Ref LogRetentionInDays
       Tags:
         - Key: Project
-          Value: live-pub-quiz
+          Value: quiz-night-live
 
   # Shared IAM Role for Payment Lambdas
   PaymentWebhookRole:
@@ -292,7 +292,7 @@ Resources:
                   - !Ref PayPalSecrets
       Tags:
         - Key: Project
-          Value: live-pub-quiz
+          Value: quiz-night-live
 
   # Secrets Manager for payment credentials
   StripeSecrets:
@@ -303,7 +303,7 @@ Resources:
       SecretString: '{"secretKey":"sk_test_placeholder","publishableKey":"pk_test_placeholder","webhookSecret":"whsec_placeholder","priceIdSupporter":"price_supporter","priceIdChampion":"price_champion"}'
       Tags:
         - Key: Project
-          Value: live-pub-quiz
+          Value: quiz-night-live
 
   PayPalSecrets:
     Type: AWS::SecretsManager::Secret
@@ -313,7 +313,7 @@ Resources:
       SecretString: '{"clientId":"placeholder","clientSecret":"placeholder","webhookId":"placeholder","planIdSupporter":"P-supporter","planIdChampion":"P-champion"}'
       Tags:
         - Key: Project
-          Value: live-pub-quiz
+          Value: quiz-night-live
 
   # ============================================
   # API Gateway for Webhooks
@@ -340,7 +340,7 @@ Resources:
           - paypal-transmission-sig
           - paypal-transmission-time
       Tags:
-        Project: live-pub-quiz
+        Project: quiz-night-live
 
   PaymentWebhookApiStage:
     Type: AWS::ApiGatewayV2::Stage
@@ -349,7 +349,7 @@ Resources:
       StageName: !Ref Stage
       AutoDeploy: true
       Tags:
-        Project: live-pub-quiz
+        Project: quiz-night-live
 
   # Stripe Webhook Route
   StripeWebhookRoute:

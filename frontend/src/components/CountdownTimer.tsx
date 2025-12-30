@@ -88,7 +88,7 @@ export function CountdownTimer({ targetTime, isActive }: CountdownTimerProps) {
 
     return () => {
       clearInterval(interval);
-      document.title = 'Live Pub Quiz';
+      document.title = 'Quiz Night Live';
     };
   }, [targetTime, isActive, checkNotifications]);
 

@@ -22,7 +22,7 @@ const ddbClient = new DynamoDBClient({ region: process.env.AWS_REGION || 'ap-sou
 const docClient = DynamoDBDocumentClient.from(ddbClient, {
   marshallOptions: { removeUndefinedValues: true },
 });
-const TABLE_NAME = process.env.TABLE_NAME || 'wpq-datatable-prod';
+const TABLE_NAME = process.env.TABLE_NAME || 'qnl-datatable-prod';
 
 // Secrets Manager for Anthropic API key
 const secretsClient = new SecretsManagerClient({ region: process.env.AWS_REGION || 'ap-southeast-2' });
