@@ -43,6 +43,19 @@ import {
 } from './roomManager';
 import type { QuestionCategory, Room } from '@quiz/shared';
 
+// ============ Data Interfaces for Ably Messages ============
+interface BuzzData {
+  playerId: string;
+  displayName?: string;
+  timestamp: number;
+  latency?: number;
+}
+
+interface AnswerData {
+  playerId: string;
+  answerIndex: number;
+}
+
 // ============ Health Check Server ============
 const HEALTH_PORT = 8080;
 let isHealthy = true;
@@ -301,7 +314,7 @@ async function awardBadge(
       );
 
       const existingBadges = user.Item?.badges || [];
-      if (existingBadges.some((b: any) => b.id === badgeType)) {
+      if (existingBadges.some((b: { id: string }) => b.id === badgeType)) {
         return false;
       }
     }
@@ -718,7 +731,7 @@ function buildRoomLeaderboard(roomId: string): LeaderboardEntry[] {
     .map((entry, index) => ({ ...entry, rank: index + 1 }));
 }
 
-async function handleRoomBuzz(roomId: string, data: any): Promise<void> {
+async function handleRoomBuzz(roomId: string, data: BuzzData): Promise<void> {
   const session = roomSessions.get(roomId);
   if (!session || session.questionPhase !== 'question') return;
   if (session.currentBuzzWinner) return;
@@ -768,7 +781,7 @@ async function handleRoomBuzz(roomId: string, data: any): Promise<void> {
   }
 }
 
-async function handleRoomAnswer(roomId: string, data: any): Promise<void> {
+async function handleRoomAnswer(roomId: string, data: AnswerData): Promise<void> {
   const session = roomSessions.get(roomId);
   if (!session || session.questionPhase !== 'answering') return;
 
