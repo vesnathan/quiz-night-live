@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: "Live Pub Quiz - Cognito User Pool"
+Description: "Quiz Night Live - Cognito User Pool"
 
 Parameters:
   Stage:
@@ -93,7 +93,7 @@ Resources:
         PreSignUp: !GetAtt CognitoPreSignUpFunction.Arn
         PostConfirmation: !GetAtt CognitoPostConfirmationFunction.Arn
       UserPoolTags:
-        Project: live-pub-quiz
+        Project: quiz-night-live
         Stage: !Ref Stage
 
   UserPoolDomain:
@@ -317,7 +317,7 @@ Resources:
         S3Key: !Sub "functions/${Stage}/cognitoPostConfirmation.zip"
       Tags:
         - Key: Project
-          Value: live-pub-quiz
+          Value: quiz-night-live
 
   CognitoPostConfirmationRole:
     Type: AWS::IAM::Role
@@ -346,7 +346,7 @@ Resources:
                   - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${DataTableName}/index/*"
       Tags:
         - Key: Project
-          Value: live-pub-quiz
+          Value: quiz-night-live
 
   CognitoPostConfirmationPermission:
     Type: AWS::Lambda::Permission
@@ -363,7 +363,7 @@ Resources:
       RetentionInDays: !Ref LogRetentionInDays
       Tags:
         - Key: Project
-          Value: live-pub-quiz
+          Value: quiz-night-live
 
   # Pre Sign-Up Lambda - links external provider accounts to existing native accounts
   CognitoPreSignUpFunction:
@@ -382,7 +382,7 @@ Resources:
         S3Key: !Sub "functions/${Stage}/cognitoPreSignUp.zip"
       Tags:
         - Key: Project
-          Value: live-pub-quiz
+          Value: quiz-night-live
 
   CognitoPreSignUpRole:
     Type: AWS::IAM::Role
@@ -412,7 +412,7 @@ Resources:
                   - !Sub "arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/*"
       Tags:
         - Key: Project
-          Value: live-pub-quiz
+          Value: quiz-night-live
 
   CognitoPreSignUpPermission:
     Type: AWS::Lambda::Permission
@@ -429,7 +429,7 @@ Resources:
       RetentionInDays: !Ref LogRetentionInDays
       Tags:
         - Key: Project
-          Value: live-pub-quiz
+          Value: quiz-night-live
 
   # Authenticated role for Cognito Identity Pool
   AuthenticatedRole:
@@ -452,7 +452,7 @@ Resources:
         - arn:aws:iam::aws:policy/AWSAppSyncInvokeFullAccess
       Tags:
         - Key: Project
-          Value: live-pub-quiz
+          Value: quiz-night-live
 
   # Unauthenticated role for Cognito Identity Pool (limited access)
   UnauthenticatedRole:
@@ -484,7 +484,7 @@ Resources:
                   - !Sub "arn:aws:appsync:${AWS::Region}:${AWS::AccountId}:apis/*/types/Query/fields/checkDisplayNameAvailable"
       Tags:
         - Key: Project
-          Value: live-pub-quiz
+          Value: quiz-night-live
 
 Outputs:
   UserPoolId:

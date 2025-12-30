@@ -57,7 +57,7 @@ const stage = getStage();
 const frontendOnly = args.includes('--frontend-only');
 
 // Configuration
-const APP_NAME = 'wpq';
+const APP_NAME = 'qnl';
 const REGION = process.env.AWS_REGION || 'ap-southeast-2';
 const bootstrapConfig = getBootstrapConfig();
 const TEMPLATE_BUCKET = bootstrapConfig.templateBucketName;
@@ -527,7 +527,7 @@ async function main(): Promise<void> {
   logger.info(`Logging to: ${logFile}`);
 
   console.log(`\n${'='.repeat(60)}`);
-  console.log(`Live Pub Quiz Deployment - Stage: ${stage}`);
+  console.log(`Quiz Night Live Deployment - Stage: ${stage}`);
   console.log(`${'='.repeat(60)}\n`);
 
   try {

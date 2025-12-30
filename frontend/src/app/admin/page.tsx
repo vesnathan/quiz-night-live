@@ -16,7 +16,7 @@ import { useLobbyChannel } from '@/hooks/useLobbyChannel';
 import { useGameStore } from '@/stores/gameStore';
 import type { RoomListItem } from '@quiz/shared';
 
-const ADMIN_EMAIL = 'vesnathan+wpq-admin@gmail.com';
+const ADMIN_EMAIL = 'vesnathan+qnl-admin@gmail.com';
 
 export default function AdminPage() {
   const router = useRouter();
@@ -193,7 +193,7 @@ export default function AdminPage() {
             <p>
               <strong className="text-primary-400">CloudWatch Logs:</strong>{' '}
               Orchestrator logs are in the{' '}
-              <code className="bg-gray-700 px-1 rounded">/ecs/wpq-orchestrator-prod</code>{' '}
+              <code className="bg-gray-700 px-1 rounded">/ecs/qnl-orchestrator-prod</code>{' '}
               log group in ap-southeast-2.
             </p>
             <p>

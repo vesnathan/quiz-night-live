@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: "Live Pub Quiz - Fargate Orchestrator"
+Description: "Quiz Night Live - Fargate Orchestrator"
 
 Parameters:
   Stage:
@@ -37,7 +37,7 @@ Resources:
           Value: enabled
       Tags:
         - Key: Project
-          Value: live-pub-quiz
+          Value: quiz-night-live
         - Key: Stage
           Value: !Ref Stage
 
@@ -68,7 +68,7 @@ Resources:
           }
       Tags:
         - Key: Project
-          Value: live-pub-quiz
+          Value: quiz-night-live
 
   # CloudWatch Log Group for Fargate
   OrchestratorLogGroup:
@@ -78,7 +78,7 @@ Resources:
       RetentionInDays: !Ref LogRetentionInDays
       Tags:
         - Key: Project
-          Value: live-pub-quiz
+          Value: quiz-night-live
 
   # IAM Role for ECS Task Execution (pulling images, logging)
   TaskExecutionRole:
@@ -96,7 +96,7 @@ Resources:
         - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
       Tags:
         - Key: Project
-          Value: live-pub-quiz
+          Value: quiz-night-live
 
   # IAM Role for the Task itself (DynamoDB access, etc.)
   TaskRole:
@@ -138,7 +138,7 @@ Resources:
                   - !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:quiz-app/anthropic-api-key*"
       Tags:
         - Key: Project
-          Value: live-pub-quiz
+          Value: quiz-night-live
 
   # ECS Task Definition
   OrchestratorTaskDefinition:
@@ -181,7 +181,7 @@ Resources:
             StartPeriod: 120
       Tags:
         - Key: Project
-          Value: live-pub-quiz
+          Value: quiz-night-live
 
   # Security Group for Fargate tasks
   OrchestratorSecurityGroup:
@@ -197,7 +197,7 @@ Resources:
           Description: Allow all outbound traffic
       Tags:
         - Key: Project
-          Value: live-pub-quiz
+          Value: quiz-night-live
         - Key: Name
           Value: !Sub "${AppName}-orchestrator-sg-${Stage}"
 
@@ -225,7 +225,7 @@ Resources:
       EnableExecuteCommand: true
       Tags:
         - Key: Project
-          Value: live-pub-quiz
+          Value: quiz-night-live
 
   # VPC Resources (minimal VPC for Fargate)
   VPC:
@@ -238,7 +238,7 @@ Resources:
         - Key: Name
           Value: !Sub "${AppName}-vpc-${Stage}"
         - Key: Project
-          Value: live-pub-quiz
+          Value: quiz-night-live
 
   InternetGateway:
     Type: AWS::EC2::InternetGateway
@@ -247,7 +247,7 @@ Resources:
         - Key: Name
           Value: !Sub "${AppName}-igw-${Stage}"
         - Key: Project
-          Value: live-pub-quiz
+          Value: quiz-night-live
 
   AttachGateway:
     Type: AWS::EC2::VPCGatewayAttachment
@@ -266,7 +266,7 @@ Resources:
         - Key: Name
           Value: !Sub "${AppName}-public-1-${Stage}"
         - Key: Project
-          Value: live-pub-quiz
+          Value: quiz-night-live
 
   PublicSubnet2:
     Type: AWS::EC2::Subnet
@@ -279,7 +279,7 @@ Resources:
         - Key: Name
           Value: !Sub "${AppName}-public-2-${Stage}"
         - Key: Project
-          Value: live-pub-quiz
+          Value: quiz-night-live
 
   PublicRouteTable:
     Type: AWS::EC2::RouteTable
@@ -289,7 +289,7 @@ Resources:
         - Key: Name
           Value: !Sub "${AppName}-public-rt-${Stage}"
         - Key: Project
-          Value: live-pub-quiz
+          Value: quiz-night-live
 
   PublicRoute:
     Type: AWS::EC2::Route

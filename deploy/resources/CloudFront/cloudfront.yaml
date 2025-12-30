@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: "Live Pub Quiz - CloudFront Distribution"
+Description: "Quiz Night Live - CloudFront Distribution"
 
 Parameters:
   Stage:
@@ -99,7 +99,7 @@ Resources:
         HttpVersion: http2and3
       Tags:
         - Key: Project
-          Value: live-pub-quiz
+          Value: quiz-night-live
         - Key: Stage
           Value: !Ref Stage
 

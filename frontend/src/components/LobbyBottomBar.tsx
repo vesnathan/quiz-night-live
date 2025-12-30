@@ -18,7 +18,7 @@ import { useChatStore } from '@/stores/chatStore';
 import { ChangePasswordModal } from './auth/ChangePasswordModal';
 import { ChatDrawer } from './chat';
 
-const ADMIN_EMAIL = 'vesnathan+wpq-admin@gmail.com';
+const ADMIN_EMAIL = 'vesnathan+qnl-admin@gmail.com';
 
 interface LobbyBottomBarProps {
   isConnected?: boolean;

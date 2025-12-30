@@ -1,7 +1,7 @@
 {
   "name": "@quiz/shared",
   "version": "1.0.0",
-  "description": "Shared types, constants, and utilities for Live Pub Quiz",
+  "description": "Shared types, constants, and utilities for Quiz Night Live",
   "main": "src/index.ts",
   "license": "MIT",
   "exports": {

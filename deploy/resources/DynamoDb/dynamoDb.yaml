@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: "Live Pub Quiz - DynamoDB Single Table"
+Description: "Quiz Night Live - DynamoDB Single Table"
 
 Parameters:
   Stage:
@@ -8,7 +8,7 @@ Parameters:
   AppName:
     Type: String
     Description: Application Name
-    Default: wpq
+    Default: qnl
 
 Resources:
   # IAM Role for AppSync to access DynamoDB
@@ -42,9 +42,9 @@ Resources:
                   - !Sub "${DataTable.Arn}/index/*"
       Tags:
         - Key: Project
-          Value: live-pub-quiz
+          Value: quiz-night-live
 
-  # Single-table design for Live Pub Quiz
+  # Single-table design for Quiz Night Live
   # ============================================
   # Access Patterns:
   #
@@ -126,7 +126,7 @@ Resources:
         - Key: "Name"
           Value: !Sub "${AppName}-datatable-${Stage}"
         - Key: Project
-          Value: live-pub-quiz
+          Value: quiz-night-live
 
 Outputs:
   DataTableName:

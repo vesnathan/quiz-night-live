@@ -26,7 +26,7 @@ yarn workspace @quiz/deploy deploy:prod
 
 ```bash
 aws cloudformation describe-stacks \
-  --stack-name wpq-prod \
+  --stack-name qnl-prod \
   --query "Stacks[0].Outputs[?contains(OutputKey, 'Webhook')].{Key:OutputKey,Value:OutputValue}" \
   --output table
 ```
@@ -105,7 +105,7 @@ You'll see:
 ```bash
 # Get current secret ARN
 STRIPE_SECRET_ARN=$(aws cloudformation describe-stacks \
-  --stack-name wpq-prod \
+  --stack-name qnl-prod \
   --query "Stacks[0].Outputs[?OutputKey=='StripeSecretsArn'].OutputValue" \
   --output text)
 
@@ -256,7 +256,7 @@ curl -s -X POST "https://api-m.paypal.com/v1/billing/plans" \
 ```bash
 # Get current secret ARN
 PAYPAL_SECRET_ARN=$(aws cloudformation describe-stacks \
-  --stack-name wpq-prod \
+  --stack-name qnl-prod \
   --query "Stacks[0].Outputs[?OutputKey=='PayPalSecretsArn'].OutputValue" \
   --output text)
 
@@ -357,8 +357,8 @@ stripe trigger checkout.session.completed
 
 1. Check CloudWatch logs:
 ```bash
-aws logs tail /aws/lambda/wpq-stripe-webhook-prod --follow
-aws logs tail /aws/lambda/wpq-paypal-webhook-prod --follow
+aws logs tail /aws/lambda/qnl-stripe-webhook-prod --follow
+aws logs tail /aws/lambda/qnl-paypal-webhook-prod --follow
 ```
 
 2. Verify webhook URL is correct in Stripe/PayPal dashboard
