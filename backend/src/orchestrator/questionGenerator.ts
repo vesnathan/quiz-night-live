@@ -10,7 +10,11 @@ interface RawQuestion {
   text?: string;
   options?: string[];
   correctIndex?: number;
-  difficulty?: string;
+  category?: string;
+  explanation?: string;
+  detailedExplanation?: string;
+  citationUrl?: string;
+  citationTitle?: string;
 }
 
 // DynamoDB setup
