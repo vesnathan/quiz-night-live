@@ -5,6 +5,14 @@ import { DynamoDBDocumentClient, QueryCommand, PutCommand, UpdateCommand } from 
 import { v4 as uuidv4 } from 'uuid';
 import type { Question, QuestionCategory } from '@quiz/shared';
 
+// Raw question from Claude API response (before validation)
+interface RawQuestion {
+  text?: string;
+  options?: string[];
+  correctIndex?: number;
+  difficulty?: string;
+}
+
 // DynamoDB setup
 const ddbClient = new DynamoDBClient({ region: process.env.AWS_REGION || 'ap-southeast-2' });
 const docClient = DynamoDBDocumentClient.from(ddbClient, {
@@ -165,17 +173,6 @@ Return ONLY valid JSON with this exact structure (no markdown, no extra text):
   }
 
   // Parse JSON response
-  interface RawQuestion {
-    text?: string;
-    options?: string[];
-    correctIndex?: number;
-    category?: string;
-    explanation?: string;
-    detailedExplanation?: string;
-    citationUrl?: string;
-    citationTitle?: string;
-  }
-
   let parsed: { questions: RawQuestion[] };
   try {
     parsed = JSON.parse(content.text);

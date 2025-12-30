@@ -43,6 +43,19 @@ import {
 } from './roomManager';
 import type { QuestionCategory, Room } from '@quiz/shared';
 
+// ============ Data Interfaces for Ably Messages ============
+interface BuzzData {
+  playerId: string;
+  displayName?: string;
+  timestamp: number;
+  latency?: number;
+}
+
+interface AnswerData {
+  playerId: string;
+  answerIndex: number;
+}
+
 // ============ Health Check Server ============
 const HEALTH_PORT = 8080;
 let isHealthy = true;
@@ -794,13 +807,6 @@ function buildRoomLeaderboard(roomId: string): LeaderboardEntry[] {
     .map((entry, index) => ({ ...entry, rank: index + 1 }));
 }
 
-interface BuzzData {
-  playerId: string;
-  displayName?: string;
-  timestamp: number;
-  latency?: number;
-}
-
 async function handleRoomBuzz(roomId: string, data: BuzzData): Promise<void> {
   const session = roomSessions.get(roomId);
   if (!session || session.questionPhase !== 'question') return;
@@ -849,11 +855,6 @@ async function handleRoomBuzz(roomId: string, data: BuzzData): Promise<void> {
       }
     }, ANSWER_TIMEOUT_MS + 500);
   }
-}
-
-interface AnswerData {
-  playerId: string;
-  answerIndex: number;
 }
 
 async function handleRoomAnswer(roomId: string, data: AnswerData): Promise<void> {
